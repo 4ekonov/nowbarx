@@ -87,6 +87,8 @@ static NSDate *NBNextOccurrence(NSInteger hour, NSInteger minute) {
 
 - (NSArray<NBItem *> *)items { return _items ?: @[]; }
 
+- (BOOL)hasMedia { return _media != nil; }
+
 #pragma mark - Setup
 
 - (void)start {
@@ -259,7 +261,7 @@ static NSDate *NBNextOccurrence(NSInteger hour, NSInteger minute) {
             }
             NSTimeInterval until = fd ? [fd timeIntervalSinceNow] : -1;
             NBLog(@"next alarm fire=%@ until=%.0f", fd, until);
-            if (until > 0 && until < 12 * 3600) {
+            if (until > 0 && until < st.alarmWindow * 60.0) {
                 alarmItem = [NBItem new];
                 alarmItem.type = NBItemTypeAlarm;
                 alarmItem.key = @"alarm";

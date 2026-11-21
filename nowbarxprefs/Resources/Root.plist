@@ -29,8 +29,14 @@
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Положение</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>Больше значение — капсула выше. Подгони под свой экран.</string>
+			<string>Больше значение — капсула выше.</string>
 			<key>label</key>
 			<string>Отступ снизу, pt</string>
 		</dict>
@@ -46,9 +52,9 @@
 			<key>key</key>
 			<string>bottomOffset</string>
 			<key>max</key>
-			<real>420.0</real>
+			<real>700.0</real>
 			<key>min</key>
-			<real>20.0</real>
+			<real>0.0</real>
 			<key>showValue</key>
 			<true/>
 		</dict>
@@ -70,9 +76,9 @@
 			<key>key</key>
 			<string>xOffset</string>
 			<key>max</key>
-			<real>150.0</real>
+			<real>300.0</real>
 			<key>min</key>
-			<real>-150.0</real>
+			<real>-300.0</real>
 			<key>showValue</key>
 			<true/>
 		</dict>
@@ -80,7 +86,13 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
-			<string>Размер капсулы</string>
+			<string>Внешний вид</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Ширина капсулы, pt</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
@@ -88,17 +100,89 @@
 			<key>cell</key>
 			<string>PSSliderCell</string>
 			<key>default</key>
-			<real>1.0</real>
+			<real>190.0</real>
 			<key>defaults</key>
 			<string>com.nowbarx.prefs</string>
 			<key>key</key>
-			<string>scale</string>
+			<string>capsuleWidth</string>
 			<key>max</key>
-			<real>1.3</real>
+			<real>420.0</real>
 			<key>min</key>
-			<real>0.8</real>
+			<real>110.0</real>
 			<key>showValue</key>
 			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Текст и значки масштабируются вместе с высотой.</string>
+			<key>label</key>
+			<string>Высота капсулы, pt</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>58.0</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>capsuleHeight</string>
+			<key>max</key>
+			<real>120.0</real>
+			<key>min</key>
+			<real>36.0</real>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>1.0 — полностью чёрный фон, меньше — прозрачнее.</string>
+			<key>label</key>
+			<string>Непрозрачность фона</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>0.85</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>bgOpacity</string>
+			<key>max</key>
+			<real>1.0</real>
+			<key>min</key>
+			<real>0.2</real>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Размытие</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>useBlur</string>
+			<key>label</key>
+			<string>Размытие под капсулой</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -140,7 +224,7 @@
 			<key>cell</key>
 			<string>PSSwitchCell</string>
 			<key>default</key>
-			<true/>
+			<false/>
 			<key>defaults</key>
 			<string>com.nowbarx.prefs</string>
 			<key>key</key>
@@ -152,7 +236,33 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>Если выключено, показывается любой плеер, а не только Spotify.</string>
+			<string>Работает только если будильник включён выше.</string>
+			<key>label</key>
+			<string>Показывать будильник за, мин</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>15.0</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>alarmWindow</string>
+			<key>max</key>
+			<real>180.0</real>
+			<key>min</key>
+			<real>1.0</real>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>«Только Spotify» выключено — показывается любой плеер.</string>
 			<key>label</key>
 			<string>Плеер</string>
 		</dict>
@@ -169,6 +279,20 @@
 			<string>spotifyOnly</string>
 			<key>label</key>
 			<string>Только Spotify</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>hideStockPlayer</string>
+			<key>label</key>
+			<string>Скрывать штатный плеер на экране блокировки</string>
 		</dict>
 		<dict>
 			<key>cell</key>

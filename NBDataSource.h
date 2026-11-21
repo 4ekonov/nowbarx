@@ -28,6 +28,7 @@ extern NSString *const NBItemsChangedNotification;
 @property (nonatomic, readonly) NSArray<NBItem *> *items;
 + (instancetype)shared;
 - (void)start;
+- (BOOL)hasMedia;
 - (void)setPolling:(BOOL)on;
 - (void)mediaCommand:(int)command;
 - (void)toggleTimer:(NBItem *)item;

@@ -30,12 +30,17 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
             @"enabled": @YES,
             @"showMedia": @YES,
             @"showTimer": @YES,
-            @"showAlarm": @YES,
+            @"showAlarm": @NO,
             @"spotifyOnly": @YES,
+            @"hideStockPlayer": @YES,
             @"haptics": @YES,
+            @"useBlur": @YES,
             @"bottomOffset": @120.0,
             @"xOffset": @0.0,
-            @"scale": @1.0,
+            @"capsuleWidth": @190.0,
+            @"capsuleHeight": @58.0,
+            @"bgOpacity": @0.85,
+            @"alarmWindow": @15.0,
         }];
         [self reload];
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
@@ -55,10 +60,15 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
     _showTimer = [_defaults boolForKey:@"showTimer"];
     _showAlarm = [_defaults boolForKey:@"showAlarm"];
     _spotifyOnly = [_defaults boolForKey:@"spotifyOnly"];
+    _hideStockPlayer = [_defaults boolForKey:@"hideStockPlayer"];
     _haptics = [_defaults boolForKey:@"haptics"];
-    _bottomOffset = [_defaults doubleForKey:@"bottomOffset"];
+    _useBlur = [_defaults boolForKey:@"useBlur"];
+    _bottomOffset = MAX(0, [_defaults doubleForKey:@"bottomOffset"]);
     _xOffset = [_defaults doubleForKey:@"xOffset"];
-    _scale = MAX(0.5, [_defaults doubleForKey:@"scale"]);
+    _capsuleWidth = MAX(100, [_defaults doubleForKey:@"capsuleWidth"]);
+    _capsuleHeight = MAX(30, [_defaults doubleForKey:@"capsuleHeight"]);
+    _bgOpacity = MAX(0.0, MIN(1.0, [_defaults doubleForKey:@"bgOpacity"]));
+    _alarmWindow = MAX(1, [_defaults doubleForKey:@"alarmWindow"]);
 }
 
 @end
