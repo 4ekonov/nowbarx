@@ -33,11 +33,14 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
             @"showAlarm": @NO,
             @"spotifyOnly": @YES,
             @"hideStockPlayer": @YES,
+            @"hideUnlockHint": @YES,
             @"haptics": @YES,
             @"useBlur": @YES,
+            @"artTint": @YES,
+            @"demoMode": @NO,
             @"bottomOffset": @120.0,
             @"xOffset": @0.0,
-            @"capsuleWidth": @190.0,
+            @"capsuleWidth": @205.0,
             @"capsuleHeight": @58.0,
             @"bgOpacity": @0.85,
             @"alarmWindow": @15.0,
@@ -61,8 +64,11 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
     _showAlarm = [_defaults boolForKey:@"showAlarm"];
     _spotifyOnly = [_defaults boolForKey:@"spotifyOnly"];
     _hideStockPlayer = [_defaults boolForKey:@"hideStockPlayer"];
+    _hideUnlockHint = [_defaults boolForKey:@"hideUnlockHint"];
     _haptics = [_defaults boolForKey:@"haptics"];
     _useBlur = [_defaults boolForKey:@"useBlur"];
+    _artTint = [_defaults boolForKey:@"artTint"];
+    _demoMode = [_defaults boolForKey:@"demoMode"];
     _bottomOffset = MAX(0, [_defaults doubleForKey:@"bottomOffset"]);
     _xOffset = [_defaults doubleForKey:@"xOffset"];
     _capsuleWidth = MAX(100, [_defaults doubleForKey:@"capsuleWidth"]);

@@ -221,6 +221,8 @@ static UIColor *NBAccent(void) {
     UIView *_expandedBox;
     CGSize _cs, _es;
     CGFloat _cornerRadius;
+    BOOL _blurOn;
+    BOOL _styleInit;
 
     // collapsed content
     UIImageView *_cArt;
@@ -352,8 +354,13 @@ static UIColor *NBAccent(void) {
 
 - (void)applyStyle {
     NBSettings *st = [NBSettings shared];
-    _blur.effect = st.useBlur ? [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark] : nil;
-    _blur.contentView.backgroundColor = [UIColor colorWithWhite:0 alpha:st.bgOpacity];
+    if (!_styleInit || _blurOn != st.useBlur) {
+        _blur.effect = st.useBlur ? [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark] : nil;
+        _blurOn = st.useBlur;
+        _styleInit = YES;
+    }
+    UIColor *base = (st.artTint && _item.tint) ? _item.tint : [UIColor blackColor];
+    _blur.contentView.backgroundColor = [base colorWithAlphaComponent:st.bgOpacity];
 }
 
 #pragma mark Press feedback
@@ -415,6 +422,7 @@ static UIColor *NBAccent(void) {
 
 - (void)configure:(NBItem *)item {
     _item = item;
+    [UIView animateWithDuration:0.35 animations:^{ [self applyStyle]; }];
     BOOL media = item.type == NBItemTypeMedia;
     BOOL timer = item.type == NBItemTypeTimer;
 
@@ -490,20 +498,21 @@ static UIColor *NBAccent(void) {
     CGFloat w = _cs.width, h = _cs.height;
     CGFloat u = h / 58.0;
     BOOL media = _item.type == NBItemTypeMedia;
-    CGFloat pad = 8 * u;
-    CGFloat icon = h - 2 * pad;
+    CGFloat padY = 9 * u;
+    CGFloat padX = MAX(padY, h * 0.27);
+    CGFloat icon = h - 2 * padY;
     CGFloat btn = 30 * u;
 
-    _cArt.frame = CGRectMake(pad, pad, icon, icon);
+    _cArt.frame = CGRectMake(padX, padY, icon, icon);
     _cArt.layer.cornerRadius = icon * 0.24;
-    _cRing.frame = CGRectMake(pad, pad, icon, icon);
+    _cRing.frame = CGRectMake(padX, padY, icon, icon);
 
-    CGFloat tx = pad + icon + 9 * u;
-    CGFloat right = media ? (btn + pad + 4 * u) : pad;
+    CGFloat tx = padX + icon + 9 * u;
+    CGFloat right = media ? (btn + padX + 6 * u) : padX;
     CGFloat tw = MAX(0, w - tx - right);
 
     if (media) {
-        _cPlay.frame = CGRectMake(w - pad - btn, (h - btn) / 2, btn, btn);
+        _cPlay.frame = CGRectMake(w - padX - btn, (h - btn) / 2, btn, btn);
         _cPlay.layer.cornerRadius = btn / 2;
         _cTitle.font = [UIFont systemFontOfSize:13 * u weight:UIFontWeightSemibold];
         _cSub.font = [UIFont systemFontOfSize:11 * u weight:UIFontWeightRegular];
@@ -520,15 +529,16 @@ static UIColor *NBAccent(void) {
 - (void)layoutExpandedContent {
     if (!_item) return;
     CGFloat w = _es.width, h = _es.height;
+    CGFloat m = 20;
     switch (_item.type) {
         case NBItemTypeMedia: {
-            _eArt.frame = CGRectMake(16, 16, 56, 56);
-            _eTitle.frame = CGRectMake(84, 18, w - 84 - 48, 22);
-            _eSub.frame = CGRectMake(84, 42, w - 84 - 48, 18);
-            _eEq.frame = CGRectMake(w - 16 - 18, 22, 18, 16);
-            _eTrack.frame = CGRectMake(16, 88, w - 32, 4);
-            _eTimeL.frame = CGRectMake(16, 96, 60, 14);
-            _eTimeR.frame = CGRectMake(w - 76, 96, 60, 14);
+            _eArt.frame = CGRectMake(m, 16, 56, 56);
+            _eTitle.frame = CGRectMake(m + 68, 18, w - m - 68 - 52, 22);
+            _eSub.frame = CGRectMake(m + 68, 42, w - m - 68 - 52, 18);
+            _eEq.frame = CGRectMake(w - m - 18, 22, 18, 16);
+            _eTrack.frame = CGRectMake(m, 88, w - 2 * m, 4);
+            _eTimeL.frame = CGRectMake(m, 96, 60, 14);
+            _eTimeR.frame = CGRectMake(w - m - 60, 96, 60, 14);
             CGFloat cy = h - 26;
             _ePrev.frame = CGRectMake(w / 2 - 70 - 22, cy - 22, 44, 44);
             _ePlay.frame = CGRectMake(w / 2 - 22, cy - 22, 44, 44);
@@ -536,16 +546,16 @@ static UIColor *NBAccent(void) {
             break;
         }
         case NBItemTypeTimer:
-            _eTitle.frame = CGRectMake(16, 14, w - 32, 18);
-            _eBig.frame = CGRectMake(16, 34, w - 32, 54);
+            _eTitle.frame = CGRectMake(m, 14, w - 2 * m, 18);
+            _eBig.frame = CGRectMake(m, 34, w - 2 * m, 54);
             _eToggle.frame = CGRectMake(w / 2 - 40 - 22, h - 14 - 44, 44, 44);
             _eStop.frame = CGRectMake(w / 2 + 40 - 22, h - 14 - 44, 44, 44);
             break;
         default:
-            _eArt.frame = CGRectMake(16, 22, 48, 48);
-            _eTitle.frame = CGRectMake(80, 24, w - 80 - 130, 22);
-            _eSub.frame = CGRectMake(80, 48, w - 80 - 130, 18);
-            _eBig.frame = CGRectMake(w - 16 - 120, 20, 120, 52);
+            _eArt.frame = CGRectMake(m, 22, 48, 48);
+            _eTitle.frame = CGRectMake(m + 64, 24, w - m - 64 - 130, 22);
+            _eSub.frame = CGRectMake(m + 64, 48, w - m - 64 - 130, 18);
+            _eBig.frame = CGRectMake(w - m - 120, 20, 120, 52);
             break;
     }
 }

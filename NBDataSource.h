@@ -12,6 +12,7 @@ typedef NS_ENUM(NSInteger, NBItemType) {
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, copy) NSString *subtitle;
 @property (nonatomic, strong) UIImage *artwork;
+@property (nonatomic, strong) UIColor *tint;
 @property (nonatomic) BOOL playing;
 @property (nonatomic) BOOL paused;
 @property (nonatomic) NSTimeInterval duration;

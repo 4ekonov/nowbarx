@@ -8,7 +8,8 @@
 
 static NBBarView *gBar;
 static __weak UIView *gHost;
-static NSHashTable<UIView *> *gHidden;
+static NSHashTable<UIView *> *gHiddenMedia;
+static NSHashTable<UIView *> *gHiddenHint;
 static int gDumpCount;
 
 static void NBEnsureBar(UIViewController *vc) {
@@ -24,43 +25,74 @@ static void NBEnsureBar(UIViewController *vc) {
     }
 }
 
-#pragma mark - Stock lock screen player
+#pragma mark - Hiding stock lock screen elements
 
-// The stock lock screen player is found by class name, because the exact class differs between iOS 15, 16 and 17.
+// The classes differ between iOS 15, 16 and 17, so they are found by name.
 static BOOL NBIsStockMedia(UIView *v) {
     NSString *n = NSStringFromClass([v class]);
     return [n containsString:@"MediaControls"] || [n containsString:@"NowPlaying"] || [n hasPrefix:@"MRU"];
 }
 
-static void NBScan(UIView *root, int depth) {
-    if (depth > 12) return;
-    for (UIView *v in root.subviews) {
-        if (v == gBar) continue;
-        if (NBIsStockMedia(v)) {
-            if (v.alpha != 0) v.alpha = 0;
-            v.userInteractionEnabled = NO;
-            [gHidden addObject:v];
-            continue;
-        }
-        NBScan(v, depth + 1);
+static BOOL NBIsUnlockHint(UIView *v) {
+    NSString *n = NSStringFromClass([v class]);
+    return [n containsString:@"TeachableMoments"] || [n containsString:@"CallToAction"];
+}
+
+static void NBHideView(UIView *v, NSHashTable<UIView *> *set) {
+    if (v.alpha != 0) v.alpha = 0;
+    v.userInteractionEnabled = NO;
+    [set addObject:v];
+}
+
+// Hides the player and the container chain around it (its background panel lives in a parent view),
+// but stops before anything that spans most of the screen or holds notifications.
+static void NBHideMediaWithBackground(UIView *media, UIView *host) {
+    NBHideView(media, gHiddenMedia);
+    CGFloat hostArea = host.bounds.size.width * host.bounds.size.height;
+    UIView *a = media.superview;
+    int guard = 0;
+    while (a && a != host && guard++ < 8) {
+        NSString *n = NSStringFromClass([a class]);
+        CGFloat area = a.bounds.size.width * a.bounds.size.height;
+        if (area > hostArea * 0.55 || [n containsString:@"Notification"] || [n containsString:@"CoverSheet"] || [n containsString:@"ScrollView"]) break;
+        NBHideView(a, gHiddenMedia);
+        a = a.superview;
     }
 }
 
-static void NBRestoreStock(void) {
-    for (UIView *v in gHidden.allObjects) {
+static void NBScan(UIView *root, UIView *host, BOOL media, BOOL hint, int depth) {
+    if (depth > 14) return;
+    for (UIView *v in [root.subviews copy]) {
+        if (v == gBar) continue;
+        if (media && NBIsStockMedia(v)) {
+            NBHideMediaWithBackground(v, host);
+            continue;
+        }
+        if (hint && NBIsUnlockHint(v)) {
+            NBHideView(v, gHiddenHint);
+            continue;
+        }
+        NBScan(v, host, media, hint, depth + 1);
+    }
+}
+
+static void NBRestore(NSHashTable<UIView *> *set) {
+    for (UIView *v in set.allObjects) {
         v.alpha = 1;
         v.userInteractionEnabled = YES;
     }
-    [gHidden removeAllObjects];
+    [set removeAllObjects];
 }
 
 static void NBUpdateStock(void) {
     UIView *host = gHost;
     if (!host) return;
     NBSettings *st = [NBSettings shared];
-    BOOL hide = st.enabled && st.hideStockPlayer && [[NBDataSource shared] hasMedia];
-    if (hide) NBScan(host, 0);
-    else if (gHidden.count) NBRestoreStock();
+    BOOL hideMedia = st.enabled && st.hideStockPlayer && [[NBDataSource shared] hasMedia];
+    BOOL hideHint = st.enabled && st.hideUnlockHint;
+    if (!hideMedia && gHiddenMedia.count) NBRestore(gHiddenMedia);
+    if (!hideHint && gHiddenHint.count) NBRestore(gHiddenHint);
+    if (hideMedia || hideHint) NBScan(host, host, hideMedia, hideHint, 0);
 }
 
 #pragma mark - Debug: dump view tree
@@ -124,7 +156,8 @@ static void NBMaybeDump(void) {}
 
 %ctor {
     @autoreleasepool {
-        gHidden = [NSHashTable weakObjectsHashTable];
+        gHiddenMedia = [NSHashTable weakObjectsHashTable];
+        gHiddenHint = [NSHashTable weakObjectsHashTable];
         [NBSettings shared];
         dispatch_async(dispatch_get_main_queue(), ^{
             [[NBDataSource shared] start];
