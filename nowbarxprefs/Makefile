@@ -7,7 +7,7 @@ BUNDLE_NAME = NowBarXPrefs
 
 NowBarXPrefs_FILES = NBRootListController.m
 NowBarXPrefs_FRAMEWORKS = UIKit
-NowBarXPrefs_PRIVATE_FRAMEWORKS = Preferences
+NowBarXPrefs_LDFLAGS = -undefined dynamic_lookup
 NowBarXPrefs_INSTALL_PATH = /Library/PreferenceBundles
 NowBarXPrefs_CFLAGS = -fobjc-arc
 
