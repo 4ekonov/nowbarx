@@ -1,4 +1,5 @@
 #import "NBRootListController.h"
+#import <Preferences/PSSpecifier.h>
 
 @implementation NBRootListController
 
