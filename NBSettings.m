@@ -30,6 +30,16 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
             @"enabled": @YES,
             @"showMedia": @YES,
             @"showTimer": @YES,
+            @"showStopwatch": @YES,
+            @"collapsedControls": @YES,
+            @"ambientEnabled": @YES,
+            @"ambFlashlight": @YES,
+            @"ambHotspot": @YES,
+            @"ambLowPower": @YES,
+            @"ambVPN": @YES,
+            @"ambCharging": @NO,
+            @"ambWeather": @YES,
+            @"ambScreenTime": @YES,
             @"showAlarm": @NO,
             @"spotifyOnly": @YES,
             @"hideStockPlayer": @YES,
@@ -40,7 +50,7 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
             @"demoMode": @NO,
             @"bottomOffset": @120.0,
             @"xOffset": @0.0,
-            @"capsuleWidth": @205.0,
+            @"capsuleWidth": @235.0,
             @"capsuleHeight": @58.0,
             @"bgOpacity": @0.85,
             @"alarmWindow": @15.0,
@@ -61,6 +71,16 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
     _enabled = [_defaults boolForKey:@"enabled"];
     _showMedia = [_defaults boolForKey:@"showMedia"];
     _showTimer = [_defaults boolForKey:@"showTimer"];
+    _showStopwatch = [_defaults boolForKey:@"showStopwatch"];
+    _collapsedControls = [_defaults boolForKey:@"collapsedControls"];
+    _ambientEnabled = [_defaults boolForKey:@"ambientEnabled"];
+    _ambFlashlight = [_defaults boolForKey:@"ambFlashlight"];
+    _ambHotspot = [_defaults boolForKey:@"ambHotspot"];
+    _ambLowPower = [_defaults boolForKey:@"ambLowPower"];
+    _ambVPN = [_defaults boolForKey:@"ambVPN"];
+    _ambCharging = [_defaults boolForKey:@"ambCharging"];
+    _ambWeather = [_defaults boolForKey:@"ambWeather"];
+    _ambScreenTime = [_defaults boolForKey:@"ambScreenTime"];
     _showAlarm = [_defaults boolForKey:@"showAlarm"];
     _spotifyOnly = [_defaults boolForKey:@"spotifyOnly"];
     _hideStockPlayer = [_defaults boolForKey:@"hideStockPlayer"];

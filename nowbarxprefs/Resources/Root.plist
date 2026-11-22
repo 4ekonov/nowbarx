@@ -100,7 +100,7 @@
 			<key>cell</key>
 			<string>PSSliderCell</string>
 			<key>default</key>
-			<real>205.0</real>
+			<real>235.0</real>
 			<key>defaults</key>
 			<string>com.nowbarx.prefs</string>
 			<key>key</key>
@@ -238,6 +238,20 @@
 			<key>cell</key>
 			<string>PSSwitchCell</string>
 			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>showStopwatch</string>
+			<key>label</key>
+			<string>Секундомер</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
 			<false/>
 			<key>defaults</key>
 			<string>com.nowbarx.prefs</string>
@@ -304,6 +318,20 @@
 			<key>defaults</key>
 			<string>com.nowbarx.prefs</string>
 			<key>key</key>
+			<string>collapsedControls</string>
+			<key>label</key>
+			<string>Кнопки «назад / вперёд» в капсуле</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
 			<string>hideStockPlayer</string>
 			<key>label</key>
 			<string>Скрывать штатный плеер на экране блокировки</string>
@@ -321,6 +349,134 @@
 			<string>hideUnlockHint</string>
 			<key>label</key>
 			<string>Скрывать надпись «Нажмите Домой…»</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Показываются по одной, самая актуальная, и только когда нет трека, таймера, секундомера или будильника. В стопку не попадают.</string>
+			<key>label</key>
+			<string>Постоянные карточки</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>ambientEnabled</string>
+			<key>label</key>
+			<string>Показывать постоянные карточки</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>ambFlashlight</string>
+			<key>label</key>
+			<string>Фонарик (кнопка выключения)</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>ambHotspot</string>
+			<key>label</key>
+			<string>Точка доступа</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>ambLowPower</string>
+			<key>label</key>
+			<string>Режим энергосбережения</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>ambVPN</string>
+			<key>label</key>
+			<string>VPN</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>ambCharging</string>
+			<key>label</key>
+			<string>Зарядка</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Погода берётся с wttr.in по вашему IP (примерный город), обновляется раз в 20 минут. Экранное время — собственный счётчик: время, пока телефон разблокирован, с момента установки; это не данные «Экранного времени» Apple.</string>
+			<key>label</key>
+			<string>Погода и экранное время</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>ambWeather</string>
+			<key>label</key>
+			<string>Погода</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>ambScreenTime</string>
+			<key>label</key>
+			<string>Экранное время за сегодня</string>
 		</dict>
 		<dict>
 			<key>cell</key>

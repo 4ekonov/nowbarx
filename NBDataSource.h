@@ -3,7 +3,9 @@
 typedef NS_ENUM(NSInteger, NBItemType) {
     NBItemTypeMedia,
     NBItemTypeTimer,
-    NBItemTypeAlarm
+    NBItemTypeAlarm,
+    NBItemTypeStopwatch,
+    NBItemTypeStatus   // permanent "ambient" card (flashlight, hotspot, weather...), never part of the stack
 };
 
 @interface NBItem : NSObject
@@ -21,6 +23,11 @@ typedef NS_ENUM(NSInteger, NBItemType) {
 @property (nonatomic, strong) NSDate *refDate;
 @property (nonatomic) NSTimeInterval remaining;
 @property (nonatomic, strong) id underlying;
+// status cards
+@property (nonatomic, copy) NSString *symbol;        // SF Symbol shown in the round icon
+@property (nonatomic, strong) UIColor *accent;       // icon colour
+@property (nonatomic, copy) NSString *actionSymbol;  // SF Symbol of the trailing button (optional)
+@property (nonatomic, copy) void (^action)(void);    // what the trailing button does
 @end
 
 extern NSString *const NBItemsChangedNotification;
@@ -31,6 +38,7 @@ extern NSString *const NBItemsChangedNotification;
 - (void)start;
 - (BOOL)hasMedia;
 - (void)setPolling:(BOOL)on;
+- (void)ambientChanged;   // called by NBAmbient when something it shows has changed
 - (void)mediaCommand:(int)command;
 - (void)toggleTimer:(NBItem *)item;
 - (void)stopTimer:(NBItem *)item;

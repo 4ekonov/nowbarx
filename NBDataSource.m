@@ -1,5 +1,6 @@
 #import "NBDataSource.h"
 #import "NBSettings.h"
+#import "NBAmbient.h"
 #import <dlfcn.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
@@ -85,23 +86,35 @@ static UIColor *NBTintFromImage(UIImage *img) {
     return [UIColor colorWithHue:h saturation:s brightness:v alpha:1];
 }
 
-static NSArray *NBFetchTimers(id mgr, NSMutableString *dbg) {
-    for (NSString *sel in @[@"timersSync", @"timers"]) {
-        id raw = NBPerform(mgr, sel);
-        id r = NBResolve(raw);
-        [dbg appendFormat:@"%@ -> raw=%@ resolved=%@\n", sel,
-            raw ? NSStringFromClass([raw class]) : @"nil", r ? NSStringFromClass([r class]) : @"nil"];
-        if ([r isKindOfClass:[NSArray class]] && [(NSArray *)r count]) return r;
-        if ([r isKindOfClass:[NSSet class]] && [(NSSet *)r count]) return [(NSSet *)r allObjects];
+// Flattens whatever a manager returned (array, set, single object, NSNull) into an array.
+static NSArray *NBObjects(id r) {
+    if (!r || [r isKindOfClass:[NSNull class]] || [r isKindOfClass:[NSError class]]) return @[];
+    if ([r isKindOfClass:[NSArray class]]) return r;
+    if ([r isKindOfClass:[NSSet class]]) return [(NSSet *)r allObjects];
+    if ([r isKindOfClass:[NSOrderedSet class]]) return [(NSOrderedSet *)r array];
+    return @[r];
+}
+
+// Calls a manager method that returns an NAFuture (or a plain value) WITHOUT blocking the main thread:
+// the result is delivered later, on the main queue. Nothing is called when the method does not exist.
+static BOOL NBAsync(id obj, NSString *sel, void (^cb)(id result)) {
+    id raw = NBPerform(obj, sel);
+    if (!raw) return NO;
+    SEL add = NSSelectorFromString(@"addSuccessBlock:");
+    if ([raw respondsToSelector:add]) {
+        void (^blk)(id) = ^(id res) {
+            dispatch_async(dispatch_get_main_queue(), ^{ cb(res); });
+        };
+        ((id (*)(id, SEL, id))objc_msgSend)(raw, add, blk);
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{ cb(raw); });
     }
-    for (NSString *sel in @[@"currentTimerSync", @"currentTimer"]) {
-        id raw = NBPerform(mgr, sel);
-        id r = NBResolve(raw);
-        [dbg appendFormat:@"%@ -> raw=%@ resolved=%@\n", sel,
-            raw ? NSStringFromClass([raw class]) : @"nil", r ? NSStringFromClass([r class]) : @"nil"];
-        if (r && ![r isKindOfClass:[NSNull class]] && ![r isKindOfClass:[NSArray class]]) return @[r];
-    }
-    return @[];
+    return YES;
+}
+
+static BOOL NBLooksLikeTimer(id o) {
+    return [o respondsToSelector:NSSelectorFromString(@"remainingTime")] ||
+           [o respondsToSelector:NSSelectorFromString(@"fireDate")];
 }
 
 static id NBFetchAlarm(id mgr, NSMutableString *dbg) {
@@ -137,6 +150,9 @@ static void NBAppendProps(NSMutableString *out, Class cls) {
 }
 
 static void NBWriteClockDebug(NSString *body) {
+    static NSDate *last;
+    if (last && [[NSDate date] timeIntervalSinceDate:last] < 2.0) return;   // do not hammer the disk
+    last = [NSDate date];
     NSMutableString *out = [NSMutableString string];
     [out appendString:body];
     [out appendString:@"\n--- classes ---\n"];
@@ -144,7 +160,9 @@ static void NBWriteClockDebug(NSString *body) {
     NBAppendMethods(out, NSClassFromString(@"MTTimerManager"), YES);
     NBAppendMethods(out, NSClassFromString(@"MTAlarmManager"), NO);
     NBAppendMethods(out, NSClassFromString(@"MTAlarmManager"), YES);
+    NBAppendMethods(out, NSClassFromString(@"MTStopwatchManager"), NO);
     NBAppendProps(out, NSClassFromString(@"MTTimer"));
+    NBAppendProps(out, NSClassFromString(@"MTStopwatch"));
     NBAppendProps(out, NSClassFromString(@"MTAlarm"));
     [out writeToFile:@"/var/mobile/Documents/NowBarX-log.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
 }
@@ -163,10 +181,17 @@ static void NBWriteClockDebug(NSString *body) {
     NBItem *_media;
     NSArray<NBItem *> *_timers;
     NBItem *_alarm;
+    NBItem *_stopwatch;
     NSArray<NBItem *> *_items;
 
     id _timerMgr;
     id _alarmMgr;
+    id _stopMgr;
+    NSMutableDictionary<NSString *, NSArray *> *_timerRaw;   // selector name -> what it returned last
+    id _stopObj;                                             // latest stopwatch snapshot
+    double _stopLastCur;
+    NSDate *_stopLastAt;
+    NSMutableString *_asyncLog;
     NSTimer *_poll;
     UIImage *_art;
     UIColor *_artTint;
@@ -235,11 +260,18 @@ static void NBWriteClockDebug(NSString *body) {
         Class am = NSClassFromString(@"MTAlarmManager");
         if (am) _alarmMgr = [[am alloc] init];
     }
+    if (!_stopMgr) {
+        Class sm = NSClassFromString(@"MTStopwatchManager");
+        if (sm) _stopMgr = [[sm alloc] init];
+    }
+    if (!_timerRaw) _timerRaw = [NSMutableDictionary dictionary];
+    if (!_asyncLog) _asyncLog = [NSMutableString string];
 }
 
 - (void)setPolling:(BOOL)on {
     [_poll invalidate];
     _poll = nil;
+    [[NBAmbient shared] setLockScreenVisible:on];
     if (!on) return;
     [self refreshMedia];
     [self refreshClock];
@@ -323,22 +355,81 @@ static void NBWriteClockDebug(NSString *body) {
     [self performSelector:@selector(refreshMedia) withObject:nil afterDelay:0.3];
 }
 
-#pragma mark Timer / Alarm
+#pragma mark Timer / Stopwatch / Alarm
 
+// Asks the Clock managers for fresh data. Results arrive asynchronously (the managers talk to a daemon),
+// each answer is cached and the items are rebuilt from the cache.
 - (void)refreshClock {
     NBSettings *st = [NBSettings shared];
     [self ensureManagers];
 
+    if (st.enabled && st.showTimer && _timerMgr) {
+        for (NSString *sel in @[@"timers", @"currentTimer", @"nextTimer", @"activeTimers"]) {
+            BOOL sent = NBAsync(_timerMgr, sel, ^(id res) {
+                NSArray *objs = NBObjects(res);
+                self->_timerRaw[sel] = objs;
+                [self->_asyncLog appendFormat:@"async %@ -> %@ (%lu)\n", sel, res ? NSStringFromClass([res class]) : @"nil", (unsigned long)objs.count];
+                [self rebuildClock];
+            });
+            if (!sent) [_asyncLog appendFormat:@"%@ not available\n", sel];
+        }
+        // synchronous variants, in case the async ones never answer
+        for (NSString *sel in @[@"timersSync", @"currentTimerSync"]) {
+            id raw = NBPerform(_timerMgr, sel);
+            if (raw) _timerRaw[sel] = NBObjects(NBResolve(raw));
+        }
+    }
+
+    if (st.enabled && st.showStopwatch && _stopMgr) {
+        for (NSString *sel in @[@"currentStopwatch", @"stopwatch"]) {
+            NBAsync(_stopMgr, sel, ^(id res) {
+                self->_stopObj = ([res isKindOfClass:[NSNull class]] || [res isKindOfClass:[NSError class]]) ? nil : res;
+                [self->_asyncLog appendFormat:@"async %@ -> %@\n", sel, res ? NSStringFromClass([res class]) : @"nil"];
+                [self rebuildClock];
+            });
+        }
+        for (NSString *sel in @[@"currentStopwatchSync", @"stopwatchSync"]) {
+            id raw = NBPerform(_stopMgr, sel);
+            if (raw) {
+                id r = NBResolve(raw);
+                if (r && ![r isKindOfClass:[NSNull class]]) _stopObj = r;
+            }
+        }
+    }
+    [self rebuildClock];
+}
+
+// Builds timer / stopwatch / alarm items from the cached manager answers.
+- (void)rebuildClock {
+    NBSettings *st = [NBSettings shared];
+    [self ensureManagers];
+    NSDate *now = [NSDate date];
+
     NSMutableString *dbg = nil;
 #ifdef NB_DEBUG
-    dbg = [NSMutableString stringWithFormat:@"now=%@\ntimerMgr=%@\nalarmMgr=%@\n", [NSDate date], _timerMgr, _alarmMgr];
+    dbg = [NSMutableString stringWithFormat:@"now=%@\ntimerMgr=%@\nalarmMgr=%@\nstopMgr=%@\n", now, _timerMgr, _alarmMgr, _stopMgr];
+    [dbg appendFormat:@"--- async log ---\n%@--- raw timers ---\n%@\n", _asyncLog, _timerRaw];
 #endif
+    if (_asyncLog.length > 3000) [_asyncLog deleteCharactersInRange:NSMakeRange(0, _asyncLog.length - 1500)];
 
+    // ---- timers
     NSMutableArray<NBItem *> *timers = [NSMutableArray array];
     if (st.enabled && st.showTimer && _timerMgr) {
-        NSArray *list = NBFetchTimers(_timerMgr, dbg);
-        NSDate *now = [NSDate date];
-        for (id t in list) {
+        // the "timers" list is authoritative when present; otherwise merge the single-timer answers
+        NSMutableArray *candidates = [NSMutableArray array];
+        BOOL authoritative = _timerRaw[@"timers"] || _timerRaw[@"timersSync"];
+        for (NSString *sel in _timerRaw) {
+            BOOL isList = [sel hasPrefix:@"timers"];
+            if (authoritative && !isList) continue;
+            for (id o in _timerRaw[sel]) if (NBLooksLikeTimer(o)) [candidates addObject:o];
+        }
+        NSMutableSet *seen = [NSMutableSet set];
+        for (id t in candidates) {
+            id idObj = NBVal(t, @"timerID");
+            id uniq = idObj ?: [NSValue valueWithNonretainedObject:t];
+            if ([seen containsObject:uniq]) continue;
+            [seen addObject:uniq];
+
             NSInteger state = [NBVal(t, @"state") integerValue];
             id fireObj = NBVal(t, @"fireDate");
             id remObj = NBVal(t, @"remainingTime");
@@ -351,8 +442,8 @@ static void NBWriteClockDebug(NSString *body) {
             BOOL running = fire && [fire timeIntervalSinceDate:now] > 0;
             BOOL paused = NO;
             if (!running) {
-                // not running by date: paused if the time left is less than the full duration
-                paused = (rem > 0.5 && dur > 0 && rem < dur - 0.5) || (state == 3 && rem > 0.5);
+                // state 3 = paused; with no fire date a partly used countdown is also a paused timer
+                paused = (state == 3 && rem > 0.5) || (!fire && rem > 0.5 && dur > 0 && rem < dur - 0.5 && state != 1);
             }
             if (!running && !paused && state == 2 && rem > 0.5) {
                 running = YES;
@@ -363,18 +454,54 @@ static void NBWriteClockDebug(NSString *body) {
             NBItem *it = [NBItem new];
             it.type = NBItemTypeTimer;
             it.underlying = t;
-            it.key = [NSString stringWithFormat:@"timer-%@", NBVal(t, @"timerID") ?: @"x"];
+            it.key = [NSString stringWithFormat:@"timer-%@", idObj ?: @"x"];
             NSString *name = NBVal(t, @"title");
             it.title = ([name isKindOfClass:[NSString class]] && name.length) ? name : @"Таймер";
             it.paused = paused;
-            it.duration = dur > 0 ? dur : rem;
-            it.remaining = rem;
+            it.duration = dur > 0 ? dur : (rem > 0 ? rem : [fire timeIntervalSinceDate:now]);
+            it.remaining = paused ? rem : MAX(0, [fire timeIntervalSinceDate:now]);
             it.refDate = running ? fire : [now dateByAddingTimeInterval:rem];
             [timers addObject:it];
         }
     }
     _timers = timers;
 
+    // ---- stopwatch (private API guessed from the class layout; see NowBarX-log.txt if it does not show)
+    NBItem *swItem = nil;
+    if (st.enabled && st.showStopwatch && _stopObj) {
+        id sw = _stopObj;
+        id startObj = NBVal(sw, @"startDate");
+        NSDate *start = [startObj isKindOfClass:[NSDate class]] ? startObj : nil;
+        id curObj = NBVal(sw, @"currentInterval") ?: NBVal(sw, @"elapsedTime") ?: NBVal(sw, @"accumulatedTime");
+        BOOL hasCur = [curObj isKindOfClass:[NSNumber class]];
+        double cur = hasCur ? [curObj doubleValue] : 0;
+        id runObj = NBVal(sw, @"isRunning") ?: NBVal(sw, @"running");
+        NSInteger state = [NBVal(sw, @"state") integerValue];
+
+        double el = hasCur ? cur : (start ? [now timeIntervalSinceDate:start] : 0);
+        BOOL running;
+        if ([runObj isKindOfClass:[NSNumber class]]) running = [runObj boolValue];
+        else if (!hasCur && start) running = YES;
+        else if (_stopLastAt && cur > _stopLastCur + 0.2) running = YES;   // value grows between polls
+        else running = (state == 2);
+        _stopLastCur = cur;
+        _stopLastAt = now;
+        [dbg appendFormat:@"stopwatch %@ state=%ld start=%@ cur=%@ running=%d el=%.2f\n", sw, (long)state, startObj, curObj, running, el];
+
+        if (running || el > 0.05) {
+            swItem = [NBItem new];
+            swItem.type = NBItemTypeStopwatch;
+            swItem.key = @"stopwatch";
+            swItem.title = @"Секундомер";
+            swItem.playing = running;
+            swItem.paused = !running;
+            swItem.elapsed = el;
+            swItem.refDate = now;
+        }
+    }
+    _stopwatch = swItem;
+
+    // ---- alarm
     NBItem *alarmItem = nil;
     if (st.enabled && st.showAlarm && _alarmMgr) {
         id a = NBFetchAlarm(_alarmMgr, dbg);
@@ -463,8 +590,18 @@ static void NBWriteClockDebug(NSString *body) {
     alarm.subtitle = @"через 15 мин";
     alarm.refDate = [_demoAnchor dateByAddingTimeInterval:900];
 
-    return @[timer, media, alarm];
+    NBItem *sw = [NBItem new];
+    sw.type = NBItemTypeStopwatch;
+    sw.key = @"demo-stopwatch";
+    sw.title = @"Секундомер";
+    sw.playing = YES;
+    sw.elapsed = spent;
+    sw.refDate = now;
+
+    return @[timer, sw, media, alarm];
 }
+
+- (void)ambientChanged { [self rebuild]; }
 
 - (void)rebuild {
     NBSettings *st = [NBSettings shared];
@@ -474,8 +611,14 @@ static void NBWriteClockDebug(NSString *body) {
     } else {
         _demoAnchor = nil;
         if (_timers.count) [all addObjectsFromArray:_timers];
+        if (_stopwatch) [all addObject:_stopwatch];
         if (_media) [all addObject:_media];
         if (_alarm) [all addObject:_alarm];
+        // permanent cards are never part of the stack: only shown when nothing else is
+        if (!all.count) {
+            NBItem *amb = [[NBAmbient shared] currentItem];
+            if (amb) [all addObject:amb];
+        }
     }
     _items = all;
     [[NSNotificationCenter defaultCenter] postNotificationName:NBItemsChangedNotification object:nil];

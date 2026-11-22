@@ -47,9 +47,12 @@ static UIColor *NBAccent(void) {
 @interface NBRingView : UIView
 @property (nonatomic) CGFloat progress;
 - (void)setGlyph:(NSString *)name;
+- (void)setAccent:(UIColor *)accent;   // nil = default orange
+- (void)setPlain:(BOOL)plain;          // plain: no ring, only a tinted round icon (status cards)
 @end
 
 @implementation NBRingView {
+    BOOL _plain;
     CAShapeLayer *_track;
     CAShapeLayer *_arc;
     UIImageView *_glyph;
@@ -97,8 +100,24 @@ static UIColor *NBAccent(void) {
     _arc.lineWidth = lw;
     _arc.strokeEnd = _progress;
     [CATransaction commit];
+    _track.hidden = _plain;
+    _arc.hidden = _plain;
     _glyph.frame = self.bounds;
-    if (_glyphName) _glyph.image = NBSym(_glyphName, w * 0.42);
+    _glyph.layer.cornerRadius = _plain ? w / 2 : 0;
+    _glyph.backgroundColor = _plain ? [_glyph.tintColor colorWithAlphaComponent:0.2] : [UIColor clearColor];
+    if (_glyphName) _glyph.image = NBSym(_glyphName, w * (_plain ? 0.46 : 0.42));
+}
+
+- (void)setAccent:(UIColor *)accent {
+    UIColor *c = accent ?: NBAccent();
+    _arc.strokeColor = c.CGColor;
+    _glyph.tintColor = c;
+    [self setNeedsLayout];
+}
+
+- (void)setPlain:(BOOL)plain {
+    _plain = plain;
+    [self setNeedsLayout];
 }
 
 - (void)setGlyph:(NSString *)name {
@@ -228,7 +247,7 @@ static UIColor *NBAccent(void) {
     UIImageView *_cArt;
     NBRingView *_cRing;
     UILabel *_cTitle, *_cSub;
-    UIButton *_cPlay;
+    UIButton *_cPlay, *_cPrev, *_cNext;
 
     // expanded content
     UIImageView *_eArt;
@@ -242,6 +261,7 @@ static UIColor *NBAccent(void) {
     switch (item.type) {
         case NBItemTypeMedia: return 150;
         case NBItemTypeTimer: return 140;
+        case NBItemTypeStopwatch: return 104;
         default: return 92;
     }
 }
@@ -287,7 +307,11 @@ static UIColor *NBAccent(void) {
         _cPlay.backgroundColor = [UIColor colorWithWhite:1 alpha:0.16];
         _cPlay.clipsToBounds = YES;
         [_cPlay addTarget:self action:@selector(tapPlay) forControlEvents:UIControlEventTouchUpInside];
-        for (UIView *v in @[_cArt, _cRing, _cTitle, _cSub, _cPlay]) [_collapsedBox addSubview:v];
+        _cPrev = NBButton(@"backward.fill", 12);
+        _cNext = NBButton(@"forward.fill", 12);
+        [_cPrev addTarget:self action:@selector(tapPrev) forControlEvents:UIControlEventTouchUpInside];
+        [_cNext addTarget:self action:@selector(tapNext) forControlEvents:UIControlEventTouchUpInside];
+        for (UIView *v in @[_cArt, _cRing, _cTitle, _cSub, _cPrev, _cNext, _cPlay]) [_collapsedBox addSubview:v];
 
         // expanded
         _eArt = [UIImageView new];
@@ -338,7 +362,11 @@ static UIColor *NBAccent(void) {
 }
 
 - (void)tapPrev { if (self.onPrev) self.onPrev(); }
-- (void)tapPlay { if (self.onPlay) self.onPlay(); }
+- (void)tapPlay {
+    // on status cards the trailing button runs the card's own action (e.g. flashlight off)
+    if (_item.type == NBItemTypeStatus) { if (_item.action) _item.action(); return; }
+    if (self.onPlay) self.onPlay();
+}
 - (void)tapNext { if (self.onNext) self.onNext(); }
 - (void)tapToggle { if (self.onTimerToggle) self.onTimerToggle(); }
 - (void)tapStop { if (self.onTimerStop) self.onTimerStop(); }
@@ -425,11 +453,16 @@ static UIColor *NBAccent(void) {
     [UIView animateWithDuration:0.35 animations:^{ [self applyStyle]; }];
     BOOL media = item.type == NBItemTypeMedia;
     BOOL timer = item.type == NBItemTypeTimer;
+    BOOL stopwatch = item.type == NBItemTypeStopwatch;
+    BOOL status = item.type == NBItemTypeStatus;
+    BOOL counter = timer || stopwatch;           // big ticking number
+    BOOL hasAction = status && item.action != nil;
 
     // collapsed
     _cArt.hidden = !media;
     _cRing.hidden = media;
-    _cPlay.hidden = !media;
+    _cPlay.hidden = !(media || hasAction);
+    _cPrev.hidden = _cNext.hidden = !media;
     _cTitle.text = item.title;
     if (media) {
         if (item.artwork) {
@@ -446,25 +479,32 @@ static UIColor *NBAccent(void) {
         _cSub.textColor = [UIColor colorWithWhite:1 alpha:0.65];
         [_cPlay setImage:NBSym(item.playing ? @"pause.fill" : @"play.fill", 14) forState:UIControlStateNormal];
     } else {
-        [_cRing setGlyph:timer ? @"timer" : @"alarm.fill"];
+        NSString *glyph = timer ? @"timer" : stopwatch ? @"stopwatch" : status ? (item.symbol ?: @"circle.fill") : @"alarm.fill";
+        [_cRing setGlyph:glyph];
+        [_cRing setPlain:status];
+        [_cRing setAccent:status ? item.accent : nil];
         _cTitle.textColor = [UIColor colorWithWhite:1 alpha:0.65];
         _cSub.textColor = [UIColor whiteColor];
+        if (status) {
+            _cSub.text = item.subtitle;
+            if (hasAction) [_cPlay setImage:NBSym(item.actionSymbol ?: @"xmark", 14) forState:UIControlStateNormal];
+        }
     }
 
     // expanded
-    _eArt.hidden = timer;
-    _eSub.hidden = timer;
+    _eArt.hidden = counter;
+    _eSub.hidden = counter;
     _eEq.hidden = !media;
     _eTrack.hidden = _eTimeL.hidden = _eTimeR.hidden = !media;
     _ePrev.hidden = _ePlay.hidden = _eNext.hidden = !media;
-    _eBig.hidden = media;
+    _eBig.hidden = media || status;
     _eToggle.hidden = _eStop.hidden = !timer;
 
     _eTitle.text = item.title;
     _eSub.text = item.subtitle;
-    _eTitle.textAlignment = timer ? NSTextAlignmentCenter : NSTextAlignmentLeft;
-    _eBig.textAlignment = timer ? NSTextAlignmentCenter : NSTextAlignmentRight;
-    _eBig.font = timer ? NBMono(46, UIFontWeightLight) : NBMono(34, UIFontWeightMedium);
+    _eTitle.textAlignment = counter ? NSTextAlignmentCenter : NSTextAlignmentLeft;
+    _eBig.textAlignment = counter ? NSTextAlignmentCenter : NSTextAlignmentRight;
+    _eBig.font = counter ? NBMono(46, UIFontWeightLight) : NBMono(34, UIFontWeightMedium);
 
     if (media) {
         if (item.artwork) {
@@ -481,6 +521,14 @@ static UIColor *NBAccent(void) {
         [_ePlay setImage:NBSym(item.playing ? @"pause.fill" : @"play.fill", 30) forState:UIControlStateNormal];
     } else if (timer) {
         [_eToggle setImage:NBSym(item.paused ? @"play.fill" : @"pause.fill", 22) forState:UIControlStateNormal];
+    } else if (stopwatch) {
+        // nothing extra: the expanded stopwatch only shows the time
+    } else if (status) {
+        _eArt.image = NBSym(item.symbol ?: @"circle.fill", 22);
+        _eArt.contentMode = UIViewContentModeCenter;
+        _eArt.backgroundColor = [(item.accent ?: NBAccent()) colorWithAlphaComponent:0.25];
+        _eArt.tintColor = item.accent ?: NBAccent();
+        _eArt.layer.cornerRadius = 24;
     } else {
         _eArt.image = NBSym(@"alarm.fill", 22);
         _eArt.contentMode = UIViewContentModeCenter;
@@ -498,6 +546,8 @@ static UIColor *NBAccent(void) {
     CGFloat w = _cs.width, h = _cs.height;
     CGFloat u = h / 58.0;
     BOOL media = _item.type == NBItemTypeMedia;
+    BOOL status = _item.type == NBItemTypeStatus;
+    BOOL hasAction = status && _item.action != nil;
     CGFloat padY = 9 * u;
     CGFloat padX = MAX(padY, h * 0.27);
     CGFloat icon = h - 2 * padY;
@@ -508,22 +558,48 @@ static UIColor *NBAccent(void) {
     _cRing.frame = CGRectMake(padX, padY, icon, icon);
 
     CGFloat tx = padX + icon + 9 * u;
-    CGFloat right = media ? (btn + padX + 6 * u) : padX;
-    CGFloat tw = MAX(0, w - tx - right);
+    CGFloat edge = padY + 3 * u;   // right padding: a bit tighter so the controls fit
+    CGFloat right = padX;
 
     if (media) {
-        _cPlay.frame = CGRectMake(w - padX - btn, (h - btn) / 2, btn, btn);
+        CGFloat side = 24 * u;
+        BOOL wantSides = [NBSettings shared].collapsedControls;
+        CGFloat withSides = 2 * side + btn + edge + 4 * u;
+        // text must keep a usable width, otherwise prev / next are dropped
+        BOOL sides = wantSides && (w - tx - withSides) >= 40 * u;
+        right = sides ? withSides : (btn + padX + 6 * u);
+        CGFloat playX = sides ? (w - edge - side - btn) : (w - padX - btn);
+        _cPlay.frame = CGRectMake(playX, (h - btn) / 2, btn, btn);
         _cPlay.layer.cornerRadius = btn / 2;
+        _cPrev.hidden = _cNext.hidden = !sides;
+        if (sides) {
+            _cPrev.frame = CGRectMake(playX - side, (h - btn) / 2, side, btn);
+            _cNext.frame = CGRectMake(playX + btn, (h - btn) / 2, side, btn);
+            [_cPrev setImage:NBSym(@"backward.fill", 12 * u) forState:UIControlStateNormal];
+            [_cNext setImage:NBSym(@"forward.fill", 12 * u) forState:UIControlStateNormal];
+        }
+        CGFloat tw = MAX(0, w - tx - right);
         _cTitle.font = [UIFont systemFontOfSize:13 * u weight:UIFontWeightSemibold];
         _cSub.font = [UIFont systemFontOfSize:11 * u weight:UIFontWeightRegular];
         _cTitle.frame = CGRectMake(tx, h / 2 - 16 * u, tw, 16 * u);
         _cSub.frame = CGRectMake(tx, h / 2 + 1 * u, tw, 14 * u);
-    } else {
-        _cTitle.font = [UIFont systemFontOfSize:11 * u weight:UIFontWeightMedium];
-        _cSub.font = NBMono(21 * u, UIFontWeightSemibold);
-        _cTitle.frame = CGRectMake(tx, h / 2 - 19 * u, tw, 14 * u);
-        _cSub.frame = CGRectMake(tx, h / 2 - 5 * u, tw, 26 * u);
+        return;
     }
+
+    if (hasAction) {
+        right = btn + padX + 6 * u;
+        _cPlay.frame = CGRectMake(w - padX - btn, (h - btn) / 2, btn, btn);
+        _cPlay.layer.cornerRadius = btn / 2;
+        _cPlay.backgroundColor = [UIColor colorWithWhite:1 alpha:0.16];
+        _cPlay.clipsToBounds = YES;
+    }
+    CGFloat tw = MAX(0, w - tx - right);
+    _cTitle.font = [UIFont systemFontOfSize:11 * u weight:UIFontWeightMedium];
+    _cSub.font = status ? [UIFont systemFontOfSize:17 * u weight:UIFontWeightSemibold] : NBMono(21 * u, UIFontWeightSemibold);
+    _cSub.adjustsFontSizeToFitWidth = status;
+    _cSub.minimumScaleFactor = 0.6;
+    _cTitle.frame = CGRectMake(tx, h / 2 - 19 * u, tw, 14 * u);
+    _cSub.frame = CGRectMake(tx, h / 2 - 5 * u, tw, 26 * u);
 }
 
 - (void)layoutExpandedContent {
@@ -545,6 +621,10 @@ static UIColor *NBAccent(void) {
             _eNext.frame = CGRectMake(w / 2 + 70 - 22, cy - 22, 44, 44);
             break;
         }
+        case NBItemTypeStopwatch:
+            _eTitle.frame = CGRectMake(m, 14, w - 2 * m, 18);
+            _eBig.frame = CGRectMake(m, 36, w - 2 * m, 56);
+            break;
         case NBItemTypeTimer:
             _eTitle.frame = CGRectMake(m, 14, w - 2 * m, 18);
             _eBig.frame = CGRectMake(m, 34, w - 2 * m, 54);
@@ -583,6 +663,18 @@ static UIColor *NBAccent(void) {
             _cRing.progress = _item.duration > 0 ? (CGFloat)(rem / _item.duration) : 1;
             break;
         }
+        case NBItemTypeStopwatch: {
+            double el = _item.elapsed;
+            if (_item.playing) el += [now timeIntervalSinceDate:_item.refDate];
+            el = MAX(0, el);
+            NSString *t = NBFmt(el);
+            _cSub.text = t;
+            _eBig.text = t;
+            _cRing.progress = (CGFloat)(fmod(el, 60.0) / 60.0);
+            break;
+        }
+        case NBItemTypeStatus:
+            break;
         default: {
             NSString *t = NBClock(_item.refDate);
             _cSub.text = t;
@@ -898,6 +990,7 @@ static UIColor *NBAccent(void) {
     NBCardView *card = (NBCardView *)g.view;
     NBItem *front = [self currentItem];
     if (card.item == front || [card.item.key isEqualToString:front.key]) {
+        if (front.type == NBItemTypeStatus) return;   // ambient cards only inform, they do not expand
         [self setExpanded:!_isExpanded];
         return;
     }
