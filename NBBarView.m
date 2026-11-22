@@ -1,3 +1,4 @@
+#import <QuartzCore/QuartzCore.h>
 #import "NBBarView.h"
 #import "NBDataSource.h"
 #import "NBSettings.h"
@@ -25,6 +26,18 @@ static NSString *NBClock(NSDate *d) {
 
 static UIFont *NBMono(CGFloat size, UIFontWeight weight) {
     return [UIFont monospacedDigitSystemFontOfSize:size weight:weight];
+}
+
+// Mixes a colour with white by `amount` (0...1).
+static UIColor *NBLighten(UIColor *c, CGFloat amount) {
+    if (amount <= 0.001) return c;
+    CGFloat r = 0, g = 0, b = 0, a = 1;
+    if (![c getRed:&r green:&g blue:&b alpha:&a]) {
+        CGFloat w = 0;
+        if (![c getWhite:&w alpha:&a]) return c;
+        r = g = b = w;
+    }
+    return [UIColor colorWithRed:r + (1 - r) * amount green:g + (1 - g) * amount blue:b + (1 - b) * amount alpha:a];
 }
 
 static UIImage *NBSym(NSString *name, CGFloat pt) {
@@ -388,7 +401,7 @@ static UIColor *NBAccent(void) {
         _blurOn = st.useBlur;
         _styleInit = YES;
     }
-    UIColor *base = (st.artTint && _item.tint) ? _item.tint : [UIColor blackColor];
+    UIColor *base = (st.artTint && _item.tint) ? NBLighten(_item.tint, st.capsuleShade * 0.8) : [UIColor colorWithWhite:st.capsuleShade alpha:1];
     _blur.contentView.backgroundColor = [base colorWithAlphaComponent:st.bgOpacity];
 }
 
@@ -697,6 +710,7 @@ static UIColor *NBAccent(void) {
 @property (nonatomic, copy) NSString *customBundle;
 - (void)reload;
 - (void)refreshState;
+- (void)restyle;
 @end
 
 @implementation NBLockButton {
@@ -707,6 +721,8 @@ static UIColor *NBAccent(void) {
     NSString *_shownAction;
     CGFloat _shownSize;
     UIImpactFeedbackGenerator *_haptic;
+    UIView *_pressOverlay;
+    BOOL _pressed;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -717,6 +733,11 @@ static UIColor *NBAccent(void) {
         [self addSubview:_blur];
         _glyph = [UIImageView new];
         _glyph.contentMode = UIViewContentModeCenter;
+        _pressOverlay = [UIView new];
+        _pressOverlay.backgroundColor = [UIColor colorWithWhite:1 alpha:0.22];
+        _pressOverlay.alpha = 0;
+        _pressOverlay.userInteractionEnabled = NO;
+        [_blur.contentView addSubview:_pressOverlay];
         [_blur.contentView addSubview:_glyph];
         _haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
 
@@ -732,16 +753,21 @@ static UIColor *NBAccent(void) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    _blur.frame = self.bounds;
-    _blur.layer.cornerRadius = self.bounds.size.width / 2;
+    // bounds + centre (not frame): _blur carries the press-scale transform
+    CGSize sz = self.bounds.size;
+    _blur.bounds = CGRectMake(0, 0, sz.width, sz.height);
+    _blur.center = CGPointMake(sz.width / 2, sz.height / 2);
+    _blur.layer.cornerRadius = sz.width / 2;
     _glyph.frame = _blur.bounds;
+    _pressOverlay.frame = _blur.bounds;
     if (_shownSize != self.bounds.size.width) [self reload];
 }
 
 - (void)applyStyleAnimated:(BOOL)animated {
     void (^apply)(void) = ^{
         // iOS style: dark glass when off, bright white disc with a dark glyph when on
-        self->_blur.contentView.backgroundColor = self->_active ? [UIColor colorWithWhite:1 alpha:0.92] : [UIColor colorWithWhite:0 alpha:0.28];
+        NBSettings *st = [NBSettings shared];
+        self->_blur.contentView.backgroundColor = self->_active ? [UIColor colorWithWhite:1 alpha:0.92] : [UIColor colorWithWhite:st.btnShade alpha:st.btnOpacity];
         self->_glyph.tintColor = self->_active ? [UIColor colorWithWhite:0.08 alpha:1] : [UIColor whiteColor];
     };
     if (animated) [UIView animateWithDuration:0.25 animations:apply]; else apply();
@@ -771,17 +797,46 @@ static UIColor *NBAccent(void) {
     [self applyStyleAnimated:YES];
 }
 
-- (void)pulse {
-    [UIView animateWithDuration:0.1 animations:^{ self.transform = CGAffineTransformMakeScale(0.88, 0.88); } completion:^(BOOL f) {
-        [UIView animateWithDuration:0.45 delay:0 usingSpringWithDamping:0.5 initialSpringVelocity:0 options:0 animations:^{
-            self.transform = CGAffineTransformIdentity;
-        } completion:nil];
-    }];
+- (void)restyle { [self applyStyleAnimated:YES]; }
+
+// Press feedback: the disc shrinks and brightens under the finger, then springs back with a little bounce.
+- (void)setPressed:(BOOL)pressed {
+    if (pressed == _pressed) return;
+    _pressed = pressed;
+    [UIView animateWithDuration:pressed ? 0.14 : 0.55 delay:0
+         usingSpringWithDamping:pressed ? 1.0 : 0.42 initialSpringVelocity:pressed ? 0 : 10
+                        options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction
+                     animations:^{
+        self->_blur.transform = pressed ? CGAffineTransformMakeScale(0.84, 0.84) : CGAffineTransformIdentity;
+        self->_pressOverlay.alpha = pressed ? 1 : 0;
+        self->_glyph.transform = pressed ? CGAffineTransformMakeScale(0.9, 0.9) : CGAffineTransformIdentity;
+    } completion:nil];
+}
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesBegan:touches withEvent:event];
+    [self setPressed:YES];
+    if ([NBSettings shared].haptics) [_haptic prepare];
+}
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesEnded:touches withEvent:event];
+    [self setPressed:NO];
+}
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesCancelled:touches withEvent:event];
+    [self setPressed:NO];
+}
+
+// A "needs long press" button answers a plain tap with a small shake.
+- (void)shake {
+    CAKeyframeAnimation *a = [CAKeyframeAnimation animationWithKeyPath:@"transform.translation.x"];
+    a.values = @[@0, @-5, @5, @-3, @3, @0];
+    a.duration = 0.32;
+    [_blur.layer addAnimation:a forKey:@"shake"];
 }
 
 - (void)run {
     if ([NBSettings shared].haptics) [_haptic impactOccurred];
-    [self pulse];
     [NBActions perform:self.action customBundle:self.customBundle];
     // state changes (Wi-Fi, flashlight ...) land a moment later
     [self performSelector:@selector(refreshState) withObject:nil afterDelay:0.4];
@@ -789,7 +844,7 @@ static UIColor *NBAccent(void) {
 }
 
 - (void)tapped {
-    if ([NBActions requiresHold:self.action]) { [self pulse]; return; }   // needs a long press
+    if ([NBActions requiresHold:self.action]) { [self shake]; return; }   // needs a long press
     [self run];
 }
 
@@ -807,6 +862,9 @@ static UIColor *NBAccent(void) {
     NSInteger _index;
     BOOL _isExpanded;
     BOOL _suppressed;
+    CFTimeInterval _clearSince;
+    UIView *_cardLayer;            // holds all cards, so the whole stack can slide away as one
+    NSTimer *_suppressTimer;
     NSTimer *_tick;
     CGSize _lastSize;
     UIImpactFeedbackGenerator *_haptic;
@@ -826,6 +884,11 @@ static UIColor *NBAccent(void) {
         _btnL.hidden = _btnR.hidden = YES;
         [self addSubview:_btnL];
         [self addSubview:_btnR];
+        _cardLayer = [[UIView alloc] initWithFrame:self.bounds];
+        _cardLayer.backgroundColor = [UIColor clearColor];
+        _cardLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        _cardLayer.userInteractionEnabled = YES;    // (the bar hit-tests its cards itself, see hitTest:)
+        [self addSubview:_cardLayer];
         _haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
         _selection = [[UISelectionFeedbackGenerator alloc] init];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemsChanged) name:NBItemsChangedNotification object:nil];
@@ -862,19 +925,47 @@ static UIColor *NBAccent(void) {
 
 #pragma mark Hit testing
 
+// Menus (search, widgets, notification history, passcode, keyboard) take the screen: the capsule slides down
+// and the side buttons slide out to the sides. They come back when the screen is clear again.
 - (void)checkSuppressed {
     NBSettings *st = [NBSettings shared];
     BOOL want = st.enabled && st.hideOnPasscode && self.suppressProbe && self.suppressProbe();
+    CFTimeInterval now = CACurrentMediaTime();
+    if (!want && _suppressed) {
+        // the screen must stay clear for a moment before the bar returns (avoids flicker)
+        if (_clearSince == 0) _clearSince = now;
+        if (now - _clearSince < 0.3) return;
+    } else {
+        _clearSince = 0;
+    }
     if (want == _suppressed) return;
     _suppressed = want;
     if (want) {
         _isExpanded = NO;
         [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(idleCollapse) object:nil];
     }
-    [UIView animateWithDuration:want ? 0.18 : 0.3 delay:0
+    [self applySuppressionAnimated:YES];
+}
+
+- (void)applySuppressionAnimated:(BOOL)animated {
+    BOOL hide = _suppressed;
+    CGSize b = self.bounds.size;
+    CGRect F = [self placeSize:[self collapsedSize]];
+    CGFloat dy = b.height - F.origin.y + 70;
+    CGFloat lw = _btnL.bounds.size.width, rw = _btnR.bounds.size.width;
+    CGFloat ldx = -(_btnL.center.x + lw / 2 + 24);
+    CGFloat rdx = b.width - (_btnR.center.x - rw / 2) + 24;
+    void (^apply)(void) = ^{
+        self->_cardLayer.transform = hide ? CGAffineTransformMakeTranslation(0, dy) : CGAffineTransformIdentity;
+        self->_btnL.transform = hide ? CGAffineTransformMakeTranslation(ldx, 0) : CGAffineTransformIdentity;
+        self->_btnR.transform = hide ? CGAffineTransformMakeTranslation(rdx, 0) : CGAffineTransformIdentity;
+    };
+    if (hide) [self layoutStackAnimated:animated];   // collapses an expanded card on the way out
+    if (!animated) { apply(); return; }
+    [UIView animateWithDuration:hide ? 0.42 : 0.55 delay:0
+         usingSpringWithDamping:hide ? 0.92 : 0.8 initialSpringVelocity:0
                         options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction
-                     animations:^{ self.alpha = want ? 0 : 1; } completion:nil];
-    if (want) { [self layoutLockButtonsAnimated:NO]; [self layoutStackAnimated:NO]; }
+                     animations:apply completion:nil];
 }
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
@@ -901,9 +992,17 @@ static UIColor *NBAccent(void) {
     [[NBDataSource shared] setPolling:active];
     [_tick invalidate];
     _tick = nil;
+    [_suppressTimer invalidate];
+    _suppressTimer = nil;
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(idleCollapse) object:nil];
+    if (!active && _suppressed) {   // next time the lock screen appears, start from a clean state
+        _suppressed = NO;
+        _clearSince = 0;
+        [self applySuppressionAnimated:NO];
+    }
     if (active) {
         _tick = [NSTimer scheduledTimerWithTimeInterval:0.25 target:self selector:@selector(tickFired) userInfo:nil repeats:YES];
+        _suppressTimer = [NSTimer scheduledTimerWithTimeInterval:0.1 target:self selector:@selector(checkSuppressed) userInfo:nil repeats:YES];
         [self layoutLockButtonsAnimated:NO];
         [self checkSuppressed];
         [_btnL refreshState];
@@ -918,7 +1017,6 @@ static UIColor *NBAccent(void) {
 
 - (void)tickFired {
     for (NBCardView *c in _cards.allValues) [c tick];
-    [self checkSuppressed];
     if ((++_btnTick % 4) == 0) {
         if (!_btnL.hidden) [_btnL refreshState];
         if (!_btnR.hidden) [_btnR refreshState];
@@ -958,10 +1056,11 @@ static UIColor *NBAccent(void) {
     _btnR.customBundle = st.btnRightApp;
     _btnL.action = st.btnLeftAction;
     _btnR.action = st.btnRightAction;
-    _btnL.transform = CGAffineTransformIdentity;
-    _btnR.transform = CGAffineTransformIdentity;
-    _btnL.frame = CGRectMake(lx, cy - sz / 2, sz, sz);
-    _btnR.frame = CGRectMake(rx, cy - sz / 2, sz, sz);
+    // bounds + centre keep working while the buttons carry the slide-away transform
+    _btnL.bounds = CGRectMake(0, 0, sz, sz);
+    _btnR.bounds = CGRectMake(0, 0, sz, sz);
+    _btnL.center = CGPointMake(lx + sz / 2, cy);
+    _btnR.center = CGPointMake(rx + sz / 2, cy);
 
     CGFloat target = _isExpanded ? 0 : 1;
     void (^apply)(void) = ^{
@@ -977,6 +1076,8 @@ static UIColor *NBAccent(void) {
 
 - (void)settingsChanged {
     [self layoutLockButtonsAnimated:NO];
+    [_btnL restyle];
+    [_btnR restyle];
     for (NBCardView *c in _cards.allValues) [c applyStyle];
     [self itemsChanged];
 }
@@ -1012,7 +1113,7 @@ static UIColor *NBAccent(void) {
     c.transform = CGAffineTransformConcat(CGAffineTransformMakeScale(0.6, 0.6), CGAffineTransformMakeTranslation(0, 22));
     c.alpha = 0;
     c.cornerRadius = [self collapsedSize].height / 2 * [NBSettings shared].cornerRadius;
-    [self addSubview:c];
+    [_cardLayer addSubview:c];
     return c;
 }
 

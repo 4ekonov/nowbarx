@@ -271,36 +271,55 @@ static void NBWeatherFor(NSInteger code, BOOL day, NSString **text, NSString **s
 
 - (void)torchOff { [self setTorchOn:NO]; }
 
-- (void)setTorchOn:(BOOL)on {
-    Class sb = NSClassFromString(@"SBUIFlashlightController");
-    id ctl = NBResponds((id)sb, @"sharedInstance") ? ((id (*)(id, SEL))objc_msgSend)((id)sb, NSSelectorFromString(@"sharedInstance")) : nil;
-    if (on) {
-        if (NBResponds(ctl, @"turnFlashlightOnForReason:")) {
-            ((void (*)(id, SEL, id))objc_msgSend)(ctl, NSSelectorFromString(@"turnFlashlightOnForReason:"), @"NowBarX");
-        } else if (NBResponds(ctl, @"setLevel:")) {
-            ((void (*)(id, SEL, unsigned long long))objc_msgSend)(ctl, NSSelectorFromString(@"setLevel:"), 4);
+// Backends are tried one at a time (the old version fired all of them together and they fought each other,
+// which made the light blink). 0 = SpringBoard's own controller, 1 = AVFlashlight, 2 = AVCaptureDevice.
+- (BOOL)torchBackend:(int)b on:(BOOL)on {
+    if (b == 0) {
+        Class sb = NSClassFromString(@"SBUIFlashlightController");
+        id ctl = NBResponds((id)sb, @"sharedInstance") ? ((id (*)(id, SEL))objc_msgSend)((id)sb, NSSelectorFromString(@"sharedInstance")) : nil;
+        NSString *sel = on ? @"turnFlashlightOnForReason:" : @"turnFlashlightOffForReason:";
+        if (NBResponds(ctl, sel)) {
+            ((void (*)(id, SEL, id))objc_msgSend)(ctl, NSSelectorFromString(sel), @"NowBarX");
+            return YES;
         }
-    } else {
-        if (NBResponds(ctl, @"turnFlashlightOffForReason:")) {
-            ((void (*)(id, SEL, id))objc_msgSend)(ctl, NSSelectorFromString(@"turnFlashlightOffForReason:"), @"NowBarX");
-        } else if (NBResponds(ctl, @"setLevel:")) {
-            ((void (*)(id, SEL, unsigned long long))objc_msgSend)(ctl, NSSelectorFromString(@"setLevel:"), 0);
+        if (NBResponds(ctl, @"setLevel:")) {
+            ((void (*)(id, SEL, unsigned long long))objc_msgSend)(ctl, NSSelectorFromString(@"setLevel:"), on ? 4 : 0);
+            return YES;
         }
+        return NO;
     }
-    @try {
-        if (!_flash && NSClassFromString(@"AVFlashlight")) _flash = [[NSClassFromString(@"AVFlashlight") alloc] init];
-        if (NBResponds(_flash, @"setFlashlightLevel:withError:")) {
-            NSError *err = nil;
-            ((BOOL (*)(id, SEL, float, NSError **))objc_msgSend)(_flash, NSSelectorFromString(@"setFlashlightLevel:withError:"), on ? 1.0f : 0.0f, &err);
-        }
-    } @catch (__unused NSException *e) {}
+    if (b == 1) {
+        @try {
+            if (!_flash && NSClassFromString(@"AVFlashlight")) _flash = [[NSClassFromString(@"AVFlashlight") alloc] init];
+            if (NBResponds(_flash, @"setFlashlightLevel:withError:")) {
+                NSError *err = nil;
+                ((BOOL (*)(id, SEL, float, NSError **))objc_msgSend)(_flash, NSSelectorFromString(@"setFlashlightLevel:withError:"), on ? 1.0f : 0.0f, &err);
+                return YES;
+            }
+        } @catch (__unused NSException *e) {}
+        return NO;
+    }
     AVCaptureDevice *d = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
     NSError *e = nil;
-    if (d.hasTorch && (d.torchMode == AVCaptureTorchModeOn) != on && [d lockForConfiguration:&e]) {
+    if (d.hasTorch && [d lockForConfiguration:&e]) {
         d.torchMode = on ? AVCaptureTorchModeOn : AVCaptureTorchModeOff;
         [d unlockForConfiguration];
+        return YES;
     }
-    [[NBDataSource shared] performSelector:@selector(ambientChanged) withObject:nil afterDelay:0.3];
+    return NO;
+}
+
+- (void)tryTorch:(BOOL)on backend:(int)b {
+    if (b > 2) return;
+    if (![self torchBackend:b on:on]) { [self tryTorch:on backend:b + 1]; return; }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.7 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if ([self isTorchOn] != on) [self tryTorch:on backend:b + 1];   // this backend did nothing, try the next one
+        else [[NBDataSource shared] ambientChanged];
+    });
+}
+
+- (void)setTorchOn:(BOOL)on {
+    [self tryTorch:on backend:0];
 }
 
 #pragma mark Other state probes

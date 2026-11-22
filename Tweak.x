@@ -12,7 +12,7 @@ static NSHashTable<UIView *> *gHiddenMedia;
 static NSHashTable<UIView *> *gHiddenHint;
 static int gDumpCount;
 
-static BOOL NBPasscodeVisible(void);
+static BOOL NBShouldHideBar(void);
 
 static void NBEnsureBar(UIViewController *vc) {
     UIView *host = vc.view;
@@ -20,7 +20,7 @@ static void NBEnsureBar(UIViewController *vc) {
     gHost = host;
     if (!gBar) {
         gBar = [[NBBarView alloc] initWithFrame:host.bounds];
-        gBar.suppressProbe = ^BOOL{ return NBPasscodeVisible(); };
+        gBar.suppressProbe = ^BOOL{ return NBShouldHideBar(); };
     }
     if (gBar.superview != host) {
         gBar.frame = host.bounds;
@@ -100,66 +100,19 @@ static void NBUpdateStock(void) {
     if (hideMedia || hideHint) NBScan(host, host, hideMedia, hideHint, 0);
 }
 
-#pragma mark - Passcode screen detection
-
-static NSString *gPasscodeHit;
-
-static CGFloat NBEffectiveAlpha(UIView *v) {
-    CGFloat a = 1;
-    for (UIView *x = v; x; x = x.superview) {
-        if (x.hidden) return 0;
-        a *= x.alpha;
-    }
-    return a;
-}
-
-// A view whose class name mentions "Passcode" that is shown, opaque enough and covers a good part of the screen.
-static BOOL NBFindPasscode(UIView *root, UIView *host, int depth) {
-    if (depth > 12) return NO;
-    CGFloat hostArea = host.bounds.size.width * host.bounds.size.height;
-    for (UIView *v in root.subviews) {
-        if (v == gBar) continue;
-        NSString *n = NSStringFromClass([v class]);
-        if ([n containsString:@"Passcode"] && !v.hidden && v.window) {
-            CGRect r = [host convertRect:v.bounds fromView:v];
-            CGRect i = CGRectIntersection(r, host.bounds);
-            if (!CGRectIsNull(i) && i.size.width * i.size.height > hostArea * 0.25 && NBEffectiveAlpha(v) > 0.3) {
-                gPasscodeHit = n;
-                return YES;
-            }
-        }
-        if (NBFindPasscode(v, host, depth + 1)) return YES;
-    }
-    return NO;
-}
-
-static BOOL NBPasscodeVisible(void) {
-    UIView *host = gHost;
-    if (!host || !host.window) return NO;
-    BOOL hit = NBFindPasscode(host, host, 0);
-#ifdef NB_DEBUG
-    static BOOL last;
-    static int writes;
-    if (hit != last && writes < 30) {
-        last = hit;
-        writes++;
-        NSString *line = [NSString stringWithFormat:@"%@ passcode visible=%d class=%@\n", [NSDate date], hit, gPasscodeHit ?: @"-"];
-        NSString *path = @"/var/mobile/Documents/NowBarX-passcode.txt";
-        NSString *old = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
-        [[old stringByAppendingString:line] writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    }
-#endif
-    return hit;
-}
-
 #pragma mark - Debug: dump view tree
 
 #ifdef NB_DEBUG
 static void NBDumpTree(UIView *v, int depth, NSMutableString *out) {
     if (depth > 10) return;
-    [out appendFormat:@"%@%@ alpha=%.2f hidden=%d frame=%@\n",
+    NSString *extra = @"";
+    if ([v isKindOfClass:[UIScrollView class]]) {
+        UIScrollView *sv = (UIScrollView *)v;
+        extra = [NSString stringWithFormat:@" SCROLL offset=%@ size=%@ inset=%@", NSStringFromCGPoint(sv.contentOffset), NSStringFromCGSize(sv.contentSize), NSStringFromUIEdgeInsets(sv.adjustedContentInset)];
+    }
+    [out appendFormat:@"%@%@ alpha=%.2f hidden=%d frame=%@%@\n",
         [@"" stringByPaddingToLength:(NSUInteger)depth * 2 withString:@" " startingAtIndex:0],
-        NSStringFromClass([v class]), v.alpha, v.hidden, NSStringFromCGRect(v.frame)];
+        NSStringFromClass([v class]), v.alpha, v.hidden, NSStringFromCGRect(v.frame), extra];
     for (UIView *s in v.subviews) NBDumpTree(s, depth + 1, out);
 }
 
@@ -176,6 +129,105 @@ static void NBMaybeDump(void) {
 static void NBMaybeDump(void) {}
 #endif
 
+#pragma mark - Menus, search, notification history, passcode, keyboard
+
+static BOOL gKeyboardUp;
+static BOOL gPasscodeCached;
+static NSHashTable<UIView *> *gMenuViews;       // "Today" / search pages (slide in from the side)
+static NSHashTable<UIScrollView *> *gNotifScrolls;
+static CFAbsoluteTime gLastScan;
+static NSString *gReason;
+
+static CGFloat NBEffectiveAlpha(UIView *v) {
+    CGFloat a = 1;
+    for (UIView *x = v; x; x = x.superview) {
+        if (x.hidden) return 0;
+        a *= x.alpha;
+    }
+    return a;
+}
+
+// Fraction of the lock screen covered by this view (0 when it is off screen, hidden or transparent).
+static CGFloat NBCoverage(UIView *v, UIView *host) {
+    if (v.hidden || !v.window || NBEffectiveAlpha(v) < 0.3) return 0;
+    CGRect r = [host convertRect:v.bounds fromView:v];
+    CGRect i = CGRectIntersection(r, host.bounds);
+    if (CGRectIsNull(i)) return 0;
+    CGFloat area = host.bounds.size.width * host.bounds.size.height;
+    return area > 0 ? (i.size.width * i.size.height) / area : 0;
+}
+
+static void NBCollect(UIView *root, UIView *host, int depth, BOOL *passcode) {
+    if (depth > 14) return;
+    for (UIView *v in root.subviews) {
+        if (v == gBar) continue;
+        NSString *n = NSStringFromClass([v class]);
+        if ([n containsString:@"Passcode"] && NBCoverage(v, host) > 0.25) *passcode = YES;
+        if ([n containsString:@"Today"] || [n containsString:@"Spotlight"] || [n containsString:@"Search"] || [n hasPrefix:@"SPUI"]) {
+            [gMenuViews addObject:v];
+        }
+        if ([v isKindOfClass:[UIScrollView class]] && [n containsString:@"Notification"]) {
+            [gNotifScrolls addObject:(UIScrollView *)v];
+        }
+        NBCollect(v, host, depth + 1, passcode);
+    }
+}
+
+static BOOL NBShouldHideBar(void) {
+    UIView *host = gHost;
+    if (!host || !host.window) return NO;
+
+    // the tree is walked a few times per second, the cached views are checked on every call
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (now - gLastScan > 0.25) {
+        gLastScan = now;
+        [gMenuViews removeAllObjects];
+        [gNotifScrolls removeAllObjects];
+        BOOL pc = NO;
+        NBCollect(host, host, 0, &pc);
+        gPasscodeCached = pc;
+    }
+
+    NSString *reason = nil;
+    if (gKeyboardUp) reason = @"keyboard";
+    else if (gPasscodeCached) reason = @"passcode";
+    if (!reason) {
+        for (UIView *v in gMenuViews.allObjects) {
+            // page views (today / search) slide in from the side; a large visible part means a menu is open
+            if (NBCoverage(v, host) > 0.12) { reason = [@"menu:" stringByAppendingString:NSStringFromClass([v class])]; break; }
+        }
+    }
+    if (!reason) {
+        for (UIScrollView *sv in gNotifScrolls.allObjects) {
+            if (sv.window && NBEffectiveAlpha(sv) > 0.3 && sv.contentOffset.y + sv.adjustedContentInset.top > 40) {
+                reason = [@"notifications:" stringByAppendingString:NSStringFromClass([sv class])];
+                break;
+            }
+        }
+    }
+
+#ifdef NB_DEBUG
+    static NSString *lastReason;
+    static int writes;
+    if (!(reason == lastReason || [reason isEqualToString:lastReason]) && writes < 40) {
+        lastReason = reason;
+        writes++;
+        NSString *path = @"/var/mobile/Documents/NowBarX-menus.txt";
+        NSString *old = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
+        NSString *line = [NSString stringWithFormat:@"%@ hide=%@\n", [NSDate date], reason ?: @"no"];
+        [[old stringByAppendingString:line] writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        if (reason && writes < 12) {   // full tree at the moment a menu is open, for diagnosis
+            NSMutableString *out = [NSMutableString stringWithFormat:@"reason=%@ keyboard=%d\n", reason, gKeyboardUp];
+            NBDumpTree(host, 0, out);
+            NSString *tp = [NSString stringWithFormat:@"/var/mobile/Documents/NowBarX-tree-%d.txt", writes];
+            [out writeToFile:tp atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        }
+    }
+#endif
+    gReason = reason;
+    return reason != nil;
+}
+
 #pragma mark - Hooks
 
 %hook CSCoverSheetViewController
@@ -187,6 +239,7 @@ static void NBMaybeDump(void) {}
 
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
+    gKeyboardUp = NO;   // a keyboard that was up when the lock screen went away must not stick
     NBEnsureBar(self);
     [gBar setActive:YES];
     NBUpdateStock();
@@ -216,6 +269,11 @@ static void NBMaybeDump(void) {}
     @autoreleasepool {
         gHiddenMedia = [NSHashTable weakObjectsHashTable];
         gHiddenHint = [NSHashTable weakObjectsHashTable];
+        gMenuViews = [NSHashTable weakObjectsHashTable];
+        gNotifScrolls = [NSHashTable weakObjectsHashTable];
+        NSNotificationCenter *kc = [NSNotificationCenter defaultCenter];
+        [kc addObserverForName:UIKeyboardWillShowNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *n) { gKeyboardUp = YES; }];
+        [kc addObserverForName:UIKeyboardWillHideNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *n) { gKeyboardUp = NO; }];
         [NBSettings shared];
         dispatch_async(dispatch_get_main_queue(), ^{
             [[NBDataSource shared] start];

@@ -74,12 +74,25 @@ static NSString *NBBundleForAction(NSString *a) {
     return m[a];
 }
 
+// SpringBoard is the process that has to answer "open this app", so a synchronous LaunchServices call made
+// from its main thread waits for itself (the phone freezes). Use SpringBoard's own in-process launcher, and
+// only fall back to LaunchServices on a background queue.
 static void NBOpenApp(NSString *bundle) {
     if (!bundle.length) return;
-    id ws = NBShared(@"LSApplicationWorkspace", @"defaultWorkspace");
-    if (NBResp(ws, @"openApplicationWithBundleID:")) {
-        ((BOOL (*)(id, SEL, id))objc_msgSend)(ws, NSSelectorFromString(@"openApplicationWithBundleID:"), bundle);
-    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIApplication *app = [UIApplication sharedApplication];
+        SEL launch = NSSelectorFromString(@"launchApplicationWithIdentifier:suspended:");
+        if ([app respondsToSelector:launch]) {
+            ((BOOL (*)(id, SEL, id, BOOL))objc_msgSend)(app, launch, bundle, NO);
+            return;
+        }
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            id ws = NBShared(@"LSApplicationWorkspace", @"defaultWorkspace");
+            if (NBResp(ws, @"openApplicationWithBundleID:")) {
+                ((BOOL (*)(id, SEL, id))objc_msgSend)(ws, NSSelectorFromString(@"openApplicationWithBundleID:"), bundle);
+            }
+        });
+    });
 }
 
 #pragma mark - Public

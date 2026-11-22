@@ -198,7 +198,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>1.0 — полностью чёрный фон, меньше — прозрачнее.</string>
+			<string>1.0 — полностью непрозрачный фон, меньше — прозрачнее.</string>
 			<key>label</key>
 			<string>Непрозрачность фона</string>
 		</dict>
@@ -217,6 +217,32 @@
 			<real>1.0</real>
 			<key>min</key>
 			<real>0.2</real>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>0 — чёрный, дальше графитовый и серый (до 60%). Цвет из обложки тоже становится светлее.</string>
+			<key>label</key>
+			<string>Цвет фона капсулы, %</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>0.0</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>capsuleShade</string>
+			<key>max</key>
+			<real>60.0</real>
+			<key>min</key>
+			<real>0.0</real>
 			<key>showValue</key>
 			<true/>
 		</dict>
@@ -496,7 +522,7 @@
 			<key>key</key>
 			<string>hideOnPasscode</string>
 			<key>label</key>
-			<string>Скрывать на экране ввода пароля</string>
+			<string>Скрывать при меню, поиске, уведомлениях, пароле</string>
 		</dict>
 		<dict>
 			<key>cell</key>

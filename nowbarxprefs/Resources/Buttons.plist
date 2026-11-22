@@ -79,6 +79,58 @@
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>0 — чёрный, до 60% — серый.</string>
+			<key>label</key>
+			<string>Цвет фона кнопок, %</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>0.0</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>btnShade</string>
+			<key>max</key>
+			<real>60.0</real>
+			<key>min</key>
+			<real>0.0</real>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Чем меньше, тем прозрачнее стекло.</string>
+			<key>label</key>
+			<string>Плотность фона кнопок, %</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>30.0</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>btnOpacity</string>
+			<key>max</key>
+			<real>100.0</real>
+			<key>min</key>
+			<real>0.0</real>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
 			<key>label</key>
 			<string>Левая кнопка</string>
 		</dict>

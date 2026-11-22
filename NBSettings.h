@@ -38,6 +38,9 @@ extern NSString *const NBSettingsChangedNotification;
 @property (nonatomic, readonly) CGFloat capsuleWidth;
 @property (nonatomic, readonly) CGFloat capsuleHeight;
 @property (nonatomic, readonly) CGFloat bgOpacity;
+@property (nonatomic, readonly) CGFloat capsuleShade;  // 0 = black ... 0.6 = mid grey (capsule background)
+@property (nonatomic, readonly) CGFloat btnShade;      // same for the side buttons
+@property (nonatomic, readonly) CGFloat btnOpacity;    // density of the side buttons' background
 @property (nonatomic, readonly) CGFloat cornerRadius; // 0...1, 1 = fully round pill
 @property (nonatomic, readonly) CGFloat contentPadX;   // inner padding of the capsule content, pt
 @property (nonatomic, readonly) CGFloat contentPadY;
