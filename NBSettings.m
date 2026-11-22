@@ -47,6 +47,15 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
             @"ambDate": @YES,
             @"ambStorage": @NO,
             @"cornerRadius": @100.0,
+            @"contentPadX": @16.0,
+            @"contentPadY": @9.0,
+            @"btnEnabled": @YES,
+            @"btnSize": @52.0,
+            @"btnGap": @12.0,
+            @"btnLeftAction": @"flashlight",
+            @"btnRightAction": @"camera",
+            @"btnLeftApp": @"",
+            @"btnRightApp": @"",
             @"showAlarm": @NO,
             @"spotifyOnly": @YES,
             @"hideStockPlayer": @YES,
@@ -55,6 +64,7 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
             @"useBlur": @YES,
             @"artTint": @YES,
             @"demoMode": @NO,
+            @"hideOnPasscode": @YES,
             @"bottomOffset": @120.0,
             @"xOffset": @0.0,
             @"capsuleWidth": @235.0,
@@ -94,6 +104,15 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
     _ambSilent = [_defaults boolForKey:@"ambSilent"];
     _ambDate = [_defaults boolForKey:@"ambDate"];
     _ambStorage = [_defaults boolForKey:@"ambStorage"];
+    _contentPadX = MAX(0.0, MIN(80.0, [_defaults doubleForKey:@"contentPadX"]));
+    _contentPadY = MAX(0.0, MIN(40.0, [_defaults doubleForKey:@"contentPadY"]));
+    _btnEnabled = [_defaults boolForKey:@"btnEnabled"];
+    _btnSize = MAX(24.0, [_defaults doubleForKey:@"btnSize"]);
+    _btnGap = MAX(0.0, [_defaults doubleForKey:@"btnGap"]);
+    _btnLeftAction = [[_defaults stringForKey:@"btnLeftAction"] copy] ?: @"none";
+    _btnRightAction = [[_defaults stringForKey:@"btnRightAction"] copy] ?: @"none";
+    _btnLeftApp = [([_defaults stringForKey:@"btnLeftApp"] ?: @"") stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    _btnRightApp = [([_defaults stringForKey:@"btnRightApp"] ?: @"") stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     _cornerRadius = MAX(0.0, MIN(100.0, [_defaults doubleForKey:@"cornerRadius"])) / 100.0;
     _showAlarm = [_defaults boolForKey:@"showAlarm"];
     _spotifyOnly = [_defaults boolForKey:@"spotifyOnly"];
@@ -103,6 +122,7 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
     _useBlur = [_defaults boolForKey:@"useBlur"];
     _artTint = [_defaults boolForKey:@"artTint"];
     _demoMode = [_defaults boolForKey:@"demoMode"];
+    _hideOnPasscode = [_defaults boolForKey:@"hideOnPasscode"];
     _bottomOffset = MAX(0, [_defaults doubleForKey:@"bottomOffset"]);
     _xOffset = [_defaults doubleForKey:@"xOffset"];
     _capsuleWidth = MAX(100, [_defaults doubleForKey:@"capsuleWidth"]);

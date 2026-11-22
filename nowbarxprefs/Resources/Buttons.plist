@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Две круглые кнопки в стиле iOS слева и справа от капсулы, по центру её высоты. Пока раскрыта карточка, кнопки скрываются.</string>
+			<key>label</key>
+			<string>Кнопки по бокам капсулы</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>btnEnabled</string>
+			<key>label</key>
+			<string>Показывать кнопки</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Размер кнопок, pt</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>52.0</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>btnSize</string>
+			<key>max</key>
+			<real>90.0</real>
+			<key>min</key>
+			<real>30.0</real>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Зазор между краем капсулы и кнопкой.</string>
+			<key>label</key>
+			<string>Расстояние от капсулы, pt</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>12.0</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>btnGap</string>
+			<key>max</key>
+			<real>200.0</real>
+			<key>min</key>
+			<real>0.0</real>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Левая кнопка</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSLinkListCell</string>
+			<key>default</key>
+			<string>flashlight</string>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>detail</key>
+			<string>PSListItemsController</string>
+			<key>key</key>
+			<string>btnLeftAction</string>
+			<key>label</key>
+			<string>Действие</string>
+			<key>validTitles</key>
+			<array>
+				<string>Ничего</string>
+				<string>Фонарик</string>
+				<string>Камера</string>
+				<string>Wi-Fi</string>
+				<string>Bluetooth</string>
+				<string>Авиарежим</string>
+				<string>Блокировка поворота</string>
+				<string>Энергосбережение</string>
+				<string>Заблокировать экран</string>
+				<string>Респринг (долгое нажатие)</string>
+				<string>Плеер: пауза / пуск</string>
+				<string>Плеер: следующий трек</string>
+				<string>Плеер: предыдущий трек</string>
+				<string>Приложение: Настройки</string>
+				<string>Приложение: Калькулятор</string>
+				<string>Приложение: Часы</string>
+				<string>Приложение: Заметки</string>
+				<string>Приложение: Телефон</string>
+				<string>Приложение: Сообщения</string>
+				<string>Приложение: Safari</string>
+				<string>Приложение: Wallet</string>
+				<string>Приложение: Spotify</string>
+				<string>Своё приложение (Bundle ID ниже)</string>
+			</array>
+			<key>validValues</key>
+			<array>
+				<string>none</string>
+				<string>flashlight</string>
+				<string>camera</string>
+				<string>wifi</string>
+				<string>bluetooth</string>
+				<string>airplane</string>
+				<string>rotation</string>
+				<string>lowpower</string>
+				<string>lock</string>
+				<string>respring</string>
+				<string>playpause</string>
+				<string>next</string>
+				<string>prev</string>
+				<string>app_settings</string>
+				<string>app_calculator</string>
+				<string>app_clock</string>
+				<string>app_notes</string>
+				<string>app_phone</string>
+				<string>app_messages</string>
+				<string>app_safari</string>
+				<string>app_wallet</string>
+				<string>app_spotify</string>
+				<string>app_custom</string>
+			</array>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Например com.apple.mobileslideshow для Фото.</string>
+			<key>label</key>
+			<string>Bundle ID для «Своё приложение»</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSEditTextCell</string>
+			<key>default</key>
+			<string></string>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>btnLeftApp</string>
+			<key>label</key>
+			<string>Bundle ID</string>
+			<key>noAutoCorrect</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Правая кнопка</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSLinkListCell</string>
+			<key>default</key>
+			<string>camera</string>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>detail</key>
+			<string>PSListItemsController</string>
+			<key>key</key>
+			<string>btnRightAction</string>
+			<key>label</key>
+			<string>Действие</string>
+			<key>validTitles</key>
+			<array>
+				<string>Ничего</string>
+				<string>Фонарик</string>
+				<string>Камера</string>
+				<string>Wi-Fi</string>
+				<string>Bluetooth</string>
+				<string>Авиарежим</string>
+				<string>Блокировка поворота</string>
+				<string>Энергосбережение</string>
+				<string>Заблокировать экран</string>
+				<string>Респринг (долгое нажатие)</string>
+				<string>Плеер: пауза / пуск</string>
+				<string>Плеер: следующий трек</string>
+				<string>Плеер: предыдущий трек</string>
+				<string>Приложение: Настройки</string>
+				<string>Приложение: Калькулятор</string>
+				<string>Приложение: Часы</string>
+				<string>Приложение: Заметки</string>
+				<string>Приложение: Телефон</string>
+				<string>Приложение: Сообщения</string>
+				<string>Приложение: Safari</string>
+				<string>Приложение: Wallet</string>
+				<string>Приложение: Spotify</string>
+				<string>Своё приложение (Bundle ID ниже)</string>
+			</array>
+			<key>validValues</key>
+			<array>
+				<string>none</string>
+				<string>flashlight</string>
+				<string>camera</string>
+				<string>wifi</string>
+				<string>bluetooth</string>
+				<string>airplane</string>
+				<string>rotation</string>
+				<string>lowpower</string>
+				<string>lock</string>
+				<string>respring</string>
+				<string>playpause</string>
+				<string>next</string>
+				<string>prev</string>
+				<string>app_settings</string>
+				<string>app_calculator</string>
+				<string>app_clock</string>
+				<string>app_notes</string>
+				<string>app_phone</string>
+				<string>app_messages</string>
+				<string>app_safari</string>
+				<string>app_wallet</string>
+				<string>app_spotify</string>
+				<string>app_custom</string>
+			</array>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Bundle ID для «Своё приложение»</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSEditTextCell</string>
+			<key>default</key>
+			<string></string>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>btnRightApp</string>
+			<key>label</key>
+			<string>Bundle ID</string>
+			<key>noAutoCorrect</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Включённые переключатели (фонарик, Wi-Fi, Bluetooth, авиарежим, поворот, энергосбережение) подсвечиваются белым. Респринг срабатывает только по долгому нажатию.</string>
+			<key>label</key>
+			<string>Заметки</string>
+		</dict>
+	</array>
+	<key>title</key>
+	<string>Кнопки</string>
+</dict>
+</plist>

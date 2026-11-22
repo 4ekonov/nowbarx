@@ -267,22 +267,37 @@ static void NBWeatherFor(NSInteger code, BOOL day, NSString **text, NSString **s
     return on;
 }
 
-- (void)torchOff {
+- (BOOL)isTorchOn { return [self torchOn:nil]; }
+
+- (void)torchOff { [self setTorchOn:NO]; }
+
+- (void)setTorchOn:(BOOL)on {
     Class sb = NSClassFromString(@"SBUIFlashlightController");
     id ctl = NBResponds((id)sb, @"sharedInstance") ? ((id (*)(id, SEL))objc_msgSend)((id)sb, NSSelectorFromString(@"sharedInstance")) : nil;
-    if (NBResponds(ctl, @"turnFlashlightOffForReason:")) {
-        ((void (*)(id, SEL, id))objc_msgSend)(ctl, NSSelectorFromString(@"turnFlashlightOffForReason:"), @"NowBarX");
-    } else if (NBResponds(ctl, @"setLevel:")) {
-        ((void (*)(id, SEL, unsigned long long))objc_msgSend)(ctl, NSSelectorFromString(@"setLevel:"), 0);
+    if (on) {
+        if (NBResponds(ctl, @"turnFlashlightOnForReason:")) {
+            ((void (*)(id, SEL, id))objc_msgSend)(ctl, NSSelectorFromString(@"turnFlashlightOnForReason:"), @"NowBarX");
+        } else if (NBResponds(ctl, @"setLevel:")) {
+            ((void (*)(id, SEL, unsigned long long))objc_msgSend)(ctl, NSSelectorFromString(@"setLevel:"), 4);
+        }
+    } else {
+        if (NBResponds(ctl, @"turnFlashlightOffForReason:")) {
+            ((void (*)(id, SEL, id))objc_msgSend)(ctl, NSSelectorFromString(@"turnFlashlightOffForReason:"), @"NowBarX");
+        } else if (NBResponds(ctl, @"setLevel:")) {
+            ((void (*)(id, SEL, unsigned long long))objc_msgSend)(ctl, NSSelectorFromString(@"setLevel:"), 0);
+        }
     }
-    if (NBResponds(_flash, @"setFlashlightLevel:withError:")) {
-        NSError *err = nil;
-        ((BOOL (*)(id, SEL, float, NSError **))objc_msgSend)(_flash, NSSelectorFromString(@"setFlashlightLevel:withError:"), 0.0f, &err);
-    }
+    @try {
+        if (!_flash && NSClassFromString(@"AVFlashlight")) _flash = [[NSClassFromString(@"AVFlashlight") alloc] init];
+        if (NBResponds(_flash, @"setFlashlightLevel:withError:")) {
+            NSError *err = nil;
+            ((BOOL (*)(id, SEL, float, NSError **))objc_msgSend)(_flash, NSSelectorFromString(@"setFlashlightLevel:withError:"), on ? 1.0f : 0.0f, &err);
+        }
+    } @catch (__unused NSException *e) {}
     AVCaptureDevice *d = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
     NSError *e = nil;
-    if (d.hasTorch && d.torchMode == AVCaptureTorchModeOn && [d lockForConfiguration:&e]) {
-        d.torchMode = AVCaptureTorchModeOff;
+    if (d.hasTorch && (d.torchMode == AVCaptureTorchModeOn) != on && [d lockForConfiguration:&e]) {
+        d.torchMode = on ? AVCaptureTorchModeOn : AVCaptureTorchModeOff;
         [d unlockForConfiguration];
     }
     [[NBDataSource shared] performSelector:@selector(ambientChanged) withObject:nil afterDelay:0.3];

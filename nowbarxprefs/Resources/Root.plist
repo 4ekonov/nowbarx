@@ -30,6 +30,36 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
+			<string>Разделы</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSLinkCell</string>
+			<key>detail</key>
+			<string>NBRootListController</string>
+			<key>isController</key>
+			<true/>
+			<key>label</key>
+			<string>Кнопки на экране блокировки</string>
+			<key>plistName</key>
+			<string>Buttons</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSLinkCell</string>
+			<key>detail</key>
+			<string>NBRootListController</string>
+			<key>isController</key>
+			<true/>
+			<key>label</key>
+			<string>Постоянные карточки</string>
+			<key>plistName</key>
+			<string>Ambient</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
 			<string>Положение</string>
 		</dict>
 		<dict>
@@ -142,32 +172,6 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>1.0 — полностью чёрный фон, меньше — прозрачнее.</string>
-			<key>label</key>
-			<string>Непрозрачность фона</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSliderCell</string>
-			<key>default</key>
-			<real>0.85</real>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>bgOpacity</string>
-			<key>max</key>
-			<real>1.0</real>
-			<key>min</key>
-			<real>0.2</real>
-			<key>showValue</key>
-			<true/>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>footerText</key>
 			<string>100 — полностью круглая пилюля, 0 — прямоугольник.</string>
 			<key>label</key>
 			<string>Скругление углов, %</string>
@@ -187,6 +191,32 @@
 			<real>100.0</real>
 			<key>min</key>
 			<real>0.0</real>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>1.0 — полностью чёрный фон, меньше — прозрачнее.</string>
+			<key>label</key>
+			<string>Непрозрачность фона</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>0.85</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>bgOpacity</string>
+			<key>max</key>
+			<real>1.0</real>
+			<key>min</key>
+			<real>0.2</real>
 			<key>showValue</key>
 			<true/>
 		</dict>
@@ -223,6 +253,64 @@
 			<string>artTint</string>
 			<key>label</key>
 			<string>Цвет фона из обложки</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Отступы внутри капсулы</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Расстояние от края капсулы до значка слева и до кнопок справа.</string>
+			<key>label</key>
+			<string>От левого и правого края, pt</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>16.0</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>contentPadX</string>
+			<key>max</key>
+			<real>60.0</real>
+			<key>min</key>
+			<real>0.0</real>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Чем больше значение, тем меньше значок.</string>
+			<key>label</key>
+			<string>От верхнего и нижнего края, pt</string>
+		</dict>
+		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>9.0</real>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>contentPadY</string>
+			<key>max</key>
+			<real>30.0</real>
+			<key>min</key>
+			<real>0.0</real>
+			<key>showValue</key>
+			<true/>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -379,234 +467,6 @@
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
-			<key>footerText</key>
-			<string>Показываются по одной, самая актуальная, и только когда нет трека, таймера, секундомера или будильника. В стопку не попадают.</string>
-			<key>label</key>
-			<string>Постоянные карточки</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambientEnabled</string>
-			<key>label</key>
-			<string>Показывать постоянные карточки</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>footerText</key>
-			<string>Показываются, пока действие активно. Порядок приоритета — как в списке.</string>
-			<key>label</key>
-			<string>Включено прямо сейчас</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambRecording</string>
-			<key>label</key>
-			<string>Запись экрана</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambFlashlight</string>
-			<key>label</key>
-			<string>Фонарик (с кнопкой выключения)</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambHotspot</string>
-			<key>label</key>
-			<string>Точка доступа</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambVPN</string>
-			<key>label</key>
-			<string>VPN</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambLowPower</string>
-			<key>label</key>
-			<string>Режим энергосбережения</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambLowBattery</string>
-			<key>label</key>
-			<string>Низкий заряд (20% и меньше)</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<false/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambHeadphones</string>
-			<key>label</key>
-			<string>Наушники (экспериментально)</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<false/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambSilent</string>
-			<key>label</key>
-			<string>Беззвучный режим (экспериментально)</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>footerText</key>
-			<string>Если включено несколько пунктов, они сменяют друг друга каждые 10 секунд. Погода берётся с open-meteo по примерному местоположению из вашего IP.</string>
-			<key>label</key>
-			<string>Информация</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambWeather</string>
-			<key>label</key>
-			<string>Погода</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambDate</string>
-			<key>label</key>
-			<string>Дата и день недели</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<false/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambStorage</string>
-			<key>label</key>
-			<string>Свободная память</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<false/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambCharging</string>
-			<key>label</key>
-			<string>Зарядка</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>footerText</key>
-			<string>Собственный счётчик: сколько времени телефон был разблокирован сегодня, с момента установки твика. Это не данные «Экранного времени» Apple. Выключите, чтобы карточка не показывалась, остальные продолжат работать.</string>
-			<key>label</key>
-			<string>Экранное время</string>
-		</dict>
-		<dict>
-			<key>PostNotification</key>
-			<string>com.nowbarx.prefs/reload</string>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.nowbarx.prefs</string>
-			<key>key</key>
-			<string>ambScreenTime</string>
-			<key>label</key>
-			<string>Экранное время за сегодня</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
 			<key>label</key>
 			<string>Прочее</string>
 		</dict>
@@ -625,10 +485,24 @@
 			<string>Вибрация</string>
 		</dict>
 		<dict>
+			<key>PostNotification</key>
+			<string>com.nowbarx.prefs/reload</string>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.nowbarx.prefs</string>
+			<key>key</key>
+			<string>hideOnPasscode</string>
+			<key>label</key>
+			<string>Скрывать на экране ввода пароля</string>
+		</dict>
+		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>Показывает тестовые карточки таймера, трека и будильника, чтобы проверить стопку.</string>
+			<string>Показывает тестовые карточки таймера, секундомера, трека и будильника, чтобы проверить стопку.</string>
 			<key>label</key>
 			<string>Проверка</string>
 		</dict>

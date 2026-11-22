@@ -7,7 +7,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = NowBarX
 
-NowBarX_FILES = Tweak.x NBSettings.m NBDataSource.m NBAmbient.m NBBarView.m
+NowBarX_FILES = Tweak.x NBSettings.m NBDataSource.m NBAmbient.m NBActions.m NBBarView.m
 NowBarX_FRAMEWORKS = UIKit QuartzCore AVFoundation
 NowBarX_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -DNB_DEBUG=1
 

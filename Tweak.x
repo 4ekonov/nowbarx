@@ -12,11 +12,16 @@ static NSHashTable<UIView *> *gHiddenMedia;
 static NSHashTable<UIView *> *gHiddenHint;
 static int gDumpCount;
 
+static BOOL NBPasscodeVisible(void);
+
 static void NBEnsureBar(UIViewController *vc) {
     UIView *host = vc.view;
     if (!host) return;
     gHost = host;
-    if (!gBar) gBar = [[NBBarView alloc] initWithFrame:host.bounds];
+    if (!gBar) {
+        gBar = [[NBBarView alloc] initWithFrame:host.bounds];
+        gBar.suppressProbe = ^BOOL{ return NBPasscodeVisible(); };
+    }
     if (gBar.superview != host) {
         gBar.frame = host.bounds;
         [host addSubview:gBar];
@@ -95,6 +100,58 @@ static void NBUpdateStock(void) {
     if (hideMedia || hideHint) NBScan(host, host, hideMedia, hideHint, 0);
 }
 
+#pragma mark - Passcode screen detection
+
+static NSString *gPasscodeHit;
+
+static CGFloat NBEffectiveAlpha(UIView *v) {
+    CGFloat a = 1;
+    for (UIView *x = v; x; x = x.superview) {
+        if (x.hidden) return 0;
+        a *= x.alpha;
+    }
+    return a;
+}
+
+// A view whose class name mentions "Passcode" that is shown, opaque enough and covers a good part of the screen.
+static BOOL NBFindPasscode(UIView *root, UIView *host, int depth) {
+    if (depth > 12) return NO;
+    CGFloat hostArea = host.bounds.size.width * host.bounds.size.height;
+    for (UIView *v in root.subviews) {
+        if (v == gBar) continue;
+        NSString *n = NSStringFromClass([v class]);
+        if ([n containsString:@"Passcode"] && !v.hidden && v.window) {
+            CGRect r = [host convertRect:v.bounds fromView:v];
+            CGRect i = CGRectIntersection(r, host.bounds);
+            if (!CGRectIsNull(i) && i.size.width * i.size.height > hostArea * 0.25 && NBEffectiveAlpha(v) > 0.3) {
+                gPasscodeHit = n;
+                return YES;
+            }
+        }
+        if (NBFindPasscode(v, host, depth + 1)) return YES;
+    }
+    return NO;
+}
+
+static BOOL NBPasscodeVisible(void) {
+    UIView *host = gHost;
+    if (!host || !host.window) return NO;
+    BOOL hit = NBFindPasscode(host, host, 0);
+#ifdef NB_DEBUG
+    static BOOL last;
+    static int writes;
+    if (hit != last && writes < 30) {
+        last = hit;
+        writes++;
+        NSString *line = [NSString stringWithFormat:@"%@ passcode visible=%d class=%@\n", [NSDate date], hit, gPasscodeHit ?: @"-"];
+        NSString *path = @"/var/mobile/Documents/NowBarX-passcode.txt";
+        NSString *old = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
+        [[old stringByAppendingString:line] writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    }
+#endif
+    return hit;
+}
+
 #pragma mark - Debug: dump view tree
 
 #ifdef NB_DEBUG
@@ -145,6 +202,7 @@ static void NBMaybeDump(void) {}
     %orig;
     NBEnsureBar(self);
     NBUpdateStock();
+    [gBar checkSuppressed];
 }
 
 - (void)viewDidDisappear:(BOOL)animated {

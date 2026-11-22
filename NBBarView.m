@@ -1,6 +1,7 @@
 #import "NBBarView.h"
 #import "NBDataSource.h"
 #import "NBSettings.h"
+#import "NBActions.h"
 
 #pragma mark - Helpers
 
@@ -548,17 +549,19 @@ static UIColor *NBAccent(void) {
     BOOL media = _item.type == NBItemTypeMedia;
     BOOL status = _item.type == NBItemTypeStatus;
     BOOL hasAction = status && _item.action != nil;
-    CGFloat padY = 9 * u;
-    CGFloat padX = MAX(padY, h * 0.27);
-    CGFloat icon = h - 2 * padY;
+    NBSettings *cst = [NBSettings shared];
+    CGFloat padX = cst.contentPadX;
+    CGFloat padY = cst.contentPadY;
+    CGFloat icon = MAX(14, h - 2 * padY);
+    CGFloat iconY = (h - icon) / 2;
     CGFloat btn = 30 * u;
 
-    _cArt.frame = CGRectMake(padX, padY, icon, icon);
+    _cArt.frame = CGRectMake(padX, iconY, icon, icon);
     _cArt.layer.cornerRadius = icon * 0.24;
-    _cRing.frame = CGRectMake(padX, padY, icon, icon);
+    _cRing.frame = CGRectMake(padX, iconY, icon, icon);
 
     CGFloat tx = padX + icon + 9 * u;
-    CGFloat edge = padY + 3 * u;   // right padding: a bit tighter so the controls fit
+    CGFloat edge = MAX(4, padX * 0.8);   // right padding: a bit tighter so the controls fit
     CGFloat right = padX;
 
     if (media) {
@@ -605,7 +608,7 @@ static UIColor *NBAccent(void) {
 - (void)layoutExpandedContent {
     if (!_item) return;
     CGFloat w = _es.width, h = _es.height;
-    CGFloat m = 20;
+    CGFloat m = 12 + 0.5 * [NBSettings shared].contentPadX;   // 20 at the default padding
     switch (_item.type) {
         case NBItemTypeMedia: {
             _eArt.frame = CGRectMake(m, 16, 56, 56);
@@ -687,6 +690,115 @@ static UIColor *NBAccent(void) {
 
 @end
 
+#pragma mark - Lock screen button (beside the capsule)
+
+@interface NBLockButton : UIView
+@property (nonatomic, copy) NSString *action;
+@property (nonatomic, copy) NSString *customBundle;
+- (void)reload;
+- (void)refreshState;
+@end
+
+@implementation NBLockButton {
+    UIVisualEffectView *_blur;
+    UIImageView *_glyph;
+    BOOL _active;
+    BOOL _styleInit;
+    NSString *_shownAction;
+    CGFloat _shownSize;
+    UIImpactFeedbackGenerator *_haptic;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    if ((self = [super initWithFrame:frame])) {
+        _blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterialDark]];
+        _blur.clipsToBounds = YES;
+        _blur.layer.cornerCurve = kCACornerCurveContinuous;
+        [self addSubview:_blur];
+        _glyph = [UIImageView new];
+        _glyph.contentMode = UIViewContentModeCenter;
+        [_blur.contentView addSubview:_glyph];
+        _haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+
+        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped)];
+        [self addGestureRecognizer:tap];
+        UILongPressGestureRecognizer *hold = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(held:)];
+        hold.minimumPressDuration = 0.55;
+        [self addGestureRecognizer:hold];
+        [self applyStyleAnimated:NO];
+    }
+    return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    _blur.frame = self.bounds;
+    _blur.layer.cornerRadius = self.bounds.size.width / 2;
+    _glyph.frame = _blur.bounds;
+    if (_shownSize != self.bounds.size.width) [self reload];
+}
+
+- (void)applyStyleAnimated:(BOOL)animated {
+    void (^apply)(void) = ^{
+        // iOS style: dark glass when off, bright white disc with a dark glyph when on
+        self->_blur.contentView.backgroundColor = self->_active ? [UIColor colorWithWhite:1 alpha:0.92] : [UIColor colorWithWhite:0 alpha:0.28];
+        self->_glyph.tintColor = self->_active ? [UIColor colorWithWhite:0.08 alpha:1] : [UIColor whiteColor];
+    };
+    if (animated) [UIView animateWithDuration:0.25 animations:apply]; else apply();
+}
+
+- (void)reload {
+    CGFloat w = self.bounds.size.width;
+    _shownSize = w;
+    _shownAction = self.action;
+    _active = [NBActions isActive:self.action];
+    _glyph.image = [NBSym([NBActions symbolForAction:self.action active:_active] ?: @"questionmark", MAX(12, w * 0.40)) imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    [self applyStyleAnimated:NO];
+}
+
+- (void)setAction:(NSString *)action {
+    if ([_action isEqualToString:action]) return;
+    _action = [action copy];
+    [self reload];
+}
+
+- (void)refreshState {
+    if (![NBActions isToggle:self.action]) return;
+    BOOL now = [NBActions isActive:self.action];
+    if (now == _active) return;
+    _active = now;
+    _glyph.image = [NBSym([NBActions symbolForAction:self.action active:_active] ?: @"questionmark", MAX(12, self.bounds.size.width * 0.40)) imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    [self applyStyleAnimated:YES];
+}
+
+- (void)pulse {
+    [UIView animateWithDuration:0.1 animations:^{ self.transform = CGAffineTransformMakeScale(0.88, 0.88); } completion:^(BOOL f) {
+        [UIView animateWithDuration:0.45 delay:0 usingSpringWithDamping:0.5 initialSpringVelocity:0 options:0 animations:^{
+            self.transform = CGAffineTransformIdentity;
+        } completion:nil];
+    }];
+}
+
+- (void)run {
+    if ([NBSettings shared].haptics) [_haptic impactOccurred];
+    [self pulse];
+    [NBActions perform:self.action customBundle:self.customBundle];
+    // state changes (Wi-Fi, flashlight ...) land a moment later
+    [self performSelector:@selector(refreshState) withObject:nil afterDelay:0.4];
+    [self performSelector:@selector(refreshState) withObject:nil afterDelay:1.2];
+}
+
+- (void)tapped {
+    if ([NBActions requiresHold:self.action]) { [self pulse]; return; }   // needs a long press
+    [self run];
+}
+
+- (void)held:(UILongPressGestureRecognizer *)g {
+    if (g.state == UIGestureRecognizerStateBegan && [NBActions requiresHold:self.action]) [self run];
+}
+
+@end
+
 #pragma mark - Bar (card stack)
 
 @implementation NBBarView {
@@ -694,10 +806,13 @@ static UIColor *NBAccent(void) {
     NSArray<NBItem *> *_items;
     NSInteger _index;
     BOOL _isExpanded;
+    BOOL _suppressed;
     NSTimer *_tick;
     CGSize _lastSize;
     UIImpactFeedbackGenerator *_haptic;
     UISelectionFeedbackGenerator *_selection;
+    NBLockButton *_btnL, *_btnR;
+    int _btnTick;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -706,6 +821,11 @@ static UIColor *NBAccent(void) {
         self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         _cards = [NSMutableDictionary dictionary];
         _items = @[];
+        _btnL = [[NBLockButton alloc] initWithFrame:CGRectMake(0, 0, 52, 52)];
+        _btnR = [[NBLockButton alloc] initWithFrame:CGRectMake(0, 0, 52, 52)];
+        _btnL.hidden = _btnR.hidden = YES;
+        [self addSubview:_btnL];
+        [self addSubview:_btnR];
         _haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
         _selection = [[UISelectionFeedbackGenerator alloc] init];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemsChanged) name:NBItemsChangedNotification object:nil];
@@ -742,7 +862,28 @@ static UIColor *NBAccent(void) {
 
 #pragma mark Hit testing
 
+- (void)checkSuppressed {
+    NBSettings *st = [NBSettings shared];
+    BOOL want = st.enabled && st.hideOnPasscode && self.suppressProbe && self.suppressProbe();
+    if (want == _suppressed) return;
+    _suppressed = want;
+    if (want) {
+        _isExpanded = NO;
+        [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(idleCollapse) object:nil];
+    }
+    [UIView animateWithDuration:want ? 0.18 : 0.3 delay:0
+                        options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction
+                     animations:^{ self.alpha = want ? 0 : 1; } completion:nil];
+    if (want) { [self layoutLockButtonsAnimated:NO]; [self layoutStackAnimated:NO]; }
+}
+
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    if (_suppressed) return nil;
+    for (NBLockButton *b in @[_btnL, _btnR]) {
+        if (b.hidden || b.alpha < 0.05) continue;
+        CGPoint bp = [self convertPoint:point toView:b];
+        if ([b pointInside:bp withEvent:event]) return [b hitTest:bp withEvent:event];
+    }
     NSInteger n = (NSInteger)_items.count;
     for (NSInteger d = 0; d < n; d++) {
         if (_isExpanded && d > 0) break;
@@ -762,20 +903,31 @@ static UIColor *NBAccent(void) {
     _tick = nil;
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(idleCollapse) object:nil];
     if (active) {
-        _tick = [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(tickFired) userInfo:nil repeats:YES];
+        _tick = [NSTimer scheduledTimerWithTimeInterval:0.25 target:self selector:@selector(tickFired) userInfo:nil repeats:YES];
+        [self layoutLockButtonsAnimated:NO];
+        [self checkSuppressed];
+        [_btnL refreshState];
+        [_btnR refreshState];
         [self itemsChanged];
     } else {
         _isExpanded = NO;
+        [self layoutLockButtonsAnimated:NO];
         [self layoutStackAnimated:NO];
     }
 }
 
 - (void)tickFired {
     for (NBCardView *c in _cards.allValues) [c tick];
+    [self checkSuppressed];
+    if ((++_btnTick % 4) == 0) {
+        if (!_btnL.hidden) [_btnL refreshState];
+        if (!_btnR.hidden) [_btnR refreshState];
+    }
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
+    [self layoutLockButtonsAnimated:NO];
     if (!CGSizeEqualToSize(_lastSize, self.bounds.size)) {
         _lastSize = self.bounds.size;
         if (_items.count) {
@@ -785,9 +937,46 @@ static UIColor *NBAccent(void) {
     }
 }
 
+#pragma mark Lock screen buttons
+
+// The buttons sit beside the collapsed capsule, vertically centred on it, and fade out while a card is expanded.
+- (void)layoutLockButtonsAnimated:(BOOL)animated {
+    CGSize b = self.bounds.size;
+    if (b.width < 50) return;
+    NBSettings *st = [NBSettings shared];
+    BOOL on = st.enabled && st.btnEnabled;
+    BOOL showL = on && ![st.btnLeftAction isEqualToString:@"none"];
+    BOOL showR = on && ![st.btnRightAction isEqualToString:@"none"];
+
+    CGRect F = [self placeSize:[self collapsedSize]];
+    CGFloat sz = st.btnSize, gap = st.btnGap;
+    CGFloat cy = CGRectGetMidY(F);
+    CGFloat lx = MAX(4, F.origin.x - gap - sz);
+    CGFloat rx = MIN(b.width - sz - 4, CGRectGetMaxX(F) + gap);
+
+    _btnL.customBundle = st.btnLeftApp;
+    _btnR.customBundle = st.btnRightApp;
+    _btnL.action = st.btnLeftAction;
+    _btnR.action = st.btnRightAction;
+    _btnL.transform = CGAffineTransformIdentity;
+    _btnR.transform = CGAffineTransformIdentity;
+    _btnL.frame = CGRectMake(lx, cy - sz / 2, sz, sz);
+    _btnR.frame = CGRectMake(rx, cy - sz / 2, sz, sz);
+
+    CGFloat target = _isExpanded ? 0 : 1;
+    void (^apply)(void) = ^{
+        self->_btnL.alpha = showL ? target : 0;
+        self->_btnR.alpha = showR ? target : 0;
+    };
+    _btnL.hidden = !showL;
+    _btnR.hidden = !showR;
+    if (animated) [UIView animateWithDuration:0.25 animations:apply]; else apply();
+}
+
 #pragma mark Data
 
 - (void)settingsChanged {
+    [self layoutLockButtonsAnimated:NO];
     for (NBCardView *c in _cards.allValues) [c applyStyle];
     [self itemsChanged];
 }
@@ -853,6 +1042,7 @@ static UIColor *NBAccent(void) {
     _items = items;
     if (!items.count) {
         _isExpanded = NO;
+        [self layoutLockButtonsAnimated:YES];
         _index = 0;
         [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(idleCollapse) object:nil];
         return;
@@ -962,6 +1152,7 @@ static UIColor *NBAccent(void) {
     if (expanded == _isExpanded) return;
     _isExpanded = expanded;
     if (expanded && [NBSettings shared].haptics) [_haptic impactOccurred];
+    [self layoutLockButtonsAnimated:YES];
     [self layoutStackAnimated:YES];
     [self scheduleIdleCollapse];
 }

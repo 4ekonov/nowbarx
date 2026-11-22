@@ -17,6 +17,7 @@ extern NSString *const NBSettingsChangedNotification;
 @property (nonatomic, readonly) BOOL useBlur;
 @property (nonatomic, readonly) BOOL artTint;
 @property (nonatomic, readonly) BOOL demoMode;
+@property (nonatomic, readonly) BOOL hideOnPasscode; // hide the bar while the passcode screen is shown
 // ambient cards
 @property (nonatomic, readonly) BOOL ambientEnabled;
 @property (nonatomic, readonly) BOOL ambFlashlight;
@@ -38,6 +39,16 @@ extern NSString *const NBSettingsChangedNotification;
 @property (nonatomic, readonly) CGFloat capsuleHeight;
 @property (nonatomic, readonly) CGFloat bgOpacity;
 @property (nonatomic, readonly) CGFloat cornerRadius; // 0...1, 1 = fully round pill
+@property (nonatomic, readonly) CGFloat contentPadX;   // inner padding of the capsule content, pt
+@property (nonatomic, readonly) CGFloat contentPadY;
+// lock screen buttons beside the capsule
+@property (nonatomic, readonly) BOOL btnEnabled;
+@property (nonatomic, readonly) CGFloat btnSize;
+@property (nonatomic, readonly) CGFloat btnGap;        // distance from the capsule edge
+@property (nonatomic, readonly, copy) NSString *btnLeftAction;
+@property (nonatomic, readonly, copy) NSString *btnRightAction;
+@property (nonatomic, readonly, copy) NSString *btnLeftApp;    // bundle id for the "custom app" action
+@property (nonatomic, readonly, copy) NSString *btnRightApp;
 @property (nonatomic, readonly) CGFloat alarmWindow; // minutes before the alarm
 + (instancetype)shared;
 @end

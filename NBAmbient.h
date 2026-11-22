@@ -6,5 +6,7 @@
 @interface NBAmbient : NSObject
 + (instancetype)shared;
 - (NBItem *)currentItem;                       // nil when nothing is relevant / disabled
+- (BOOL)isTorchOn;
+- (void)setTorchOn:(BOOL)on;
 - (void)setLockScreenVisible:(BOOL)visible;    // also drives the screen-time counter
 @end
