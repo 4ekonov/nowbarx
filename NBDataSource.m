@@ -275,8 +275,19 @@ static void NBWriteClockDebug(NSString *body) {
     if (!on) return;
     [self refreshMedia];
     [self refreshClock];
-    _poll = [NSTimer scheduledTimerWithTimeInterval:3.0 repeats:YES block:^(NSTimer *t) {
-        [self refreshClock];
+    __block int n = 0;
+    _poll = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *t) {
+        n++;
+        if (n % 3 == 0) {
+            [self refreshClock];     // Clock data every 3 s
+            return;
+        }
+        // in between: only re-check the permanent card when it is the one being shown (or could be)
+        NBItem *cur = self->_items.firstObject;
+        BOOL ambientMode = (self->_items.count == 0) || (self->_items.count == 1 && cur.type == NBItemTypeStatus);
+        if (!ambientMode) return;
+        NSString *want = [[NBAmbient shared] currentItem].key;
+        if (!(want == nil && cur == nil) && ![want isEqualToString:cur.key]) [self rebuild];
     }];
 }
 

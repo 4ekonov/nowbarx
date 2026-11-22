@@ -1,6 +1,6 @@
 Package: com.nowbarx.tweak
 Name: NowBarX
-Version: 0.4.0
+Version: 0.5.0
 Architecture: iphoneos-arm
 Description: Samsung-style Now Bar for the iOS lock screen (Spotify, timer, stopwatch, alarm, status cards)
 Maintainer: you

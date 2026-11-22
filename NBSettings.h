@@ -26,11 +26,18 @@ extern NSString *const NBSettingsChangedNotification;
 @property (nonatomic, readonly) BOOL ambCharging;
 @property (nonatomic, readonly) BOOL ambWeather;
 @property (nonatomic, readonly) BOOL ambScreenTime;
+@property (nonatomic, readonly) BOOL ambLowBattery;
+@property (nonatomic, readonly) BOOL ambHeadphones;
+@property (nonatomic, readonly) BOOL ambRecording;
+@property (nonatomic, readonly) BOOL ambSilent;
+@property (nonatomic, readonly) BOOL ambDate;
+@property (nonatomic, readonly) BOOL ambStorage;
 @property (nonatomic, readonly) CGFloat bottomOffset;
 @property (nonatomic, readonly) CGFloat xOffset;
 @property (nonatomic, readonly) CGFloat capsuleWidth;
 @property (nonatomic, readonly) CGFloat capsuleHeight;
 @property (nonatomic, readonly) CGFloat bgOpacity;
+@property (nonatomic, readonly) CGFloat cornerRadius; // 0...1, 1 = fully round pill
 @property (nonatomic, readonly) CGFloat alarmWindow; // minutes before the alarm
 + (instancetype)shared;
 @end

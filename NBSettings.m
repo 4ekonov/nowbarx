@@ -40,6 +40,13 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
             @"ambCharging": @NO,
             @"ambWeather": @YES,
             @"ambScreenTime": @YES,
+            @"ambLowBattery": @YES,
+            @"ambHeadphones": @NO,
+            @"ambRecording": @YES,
+            @"ambSilent": @NO,
+            @"ambDate": @YES,
+            @"ambStorage": @NO,
+            @"cornerRadius": @100.0,
             @"showAlarm": @NO,
             @"spotifyOnly": @YES,
             @"hideStockPlayer": @YES,
@@ -81,6 +88,13 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
     _ambCharging = [_defaults boolForKey:@"ambCharging"];
     _ambWeather = [_defaults boolForKey:@"ambWeather"];
     _ambScreenTime = [_defaults boolForKey:@"ambScreenTime"];
+    _ambLowBattery = [_defaults boolForKey:@"ambLowBattery"];
+    _ambHeadphones = [_defaults boolForKey:@"ambHeadphones"];
+    _ambRecording = [_defaults boolForKey:@"ambRecording"];
+    _ambSilent = [_defaults boolForKey:@"ambSilent"];
+    _ambDate = [_defaults boolForKey:@"ambDate"];
+    _ambStorage = [_defaults boolForKey:@"ambStorage"];
+    _cornerRadius = MAX(0.0, MIN(100.0, [_defaults doubleForKey:@"cornerRadius"])) / 100.0;
     _showAlarm = [_defaults boolForKey:@"showAlarm"];
     _spotifyOnly = [_defaults boolForKey:@"spotifyOnly"];
     _hideStockPlayer = [_defaults boolForKey:@"hideStockPlayer"];

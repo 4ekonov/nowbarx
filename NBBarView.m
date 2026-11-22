@@ -822,7 +822,7 @@ static UIColor *NBAccent(void) {
     c.center = CGPointMake(CGRectGetMidX(F), CGRectGetMidY(F));
     c.transform = CGAffineTransformConcat(CGAffineTransformMakeScale(0.6, 0.6), CGAffineTransformMakeTranslation(0, 22));
     c.alpha = 0;
-    c.cornerRadius = [self collapsedSize].height / 2;
+    c.cornerRadius = [self collapsedSize].height / 2 * [NBSettings shared].cornerRadius;
     [self addSubview:c];
     return c;
 }
@@ -929,7 +929,7 @@ static UIColor *NBAccent(void) {
             if (d == 0) c.alpha = 1;
             else if (expandedMode) c.alpha = 0;
             else c.alpha = (d <= 2) ? (1 - 0.22 * (CGFloat)d) : 0;
-            c.cornerRadius = exp ? 26 : sz.height / 2;
+            c.cornerRadius = exp ? 26 * st.cornerRadius : sz.height / 2 * st.cornerRadius;
             [c layoutBoxesExpanded:exp];
         }
     };
