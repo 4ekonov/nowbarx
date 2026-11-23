@@ -2,6 +2,7 @@
 #import "NBBarView.h"
 #import "NBDataSource.h"
 #import "NBSettings.h"
+#import <objc/message.h>
 
 @interface CSCoverSheetViewController : UIViewController
 @end
@@ -13,6 +14,7 @@ static NSHashTable<UIView *> *gHiddenHint;
 static int gDumpCount;
 
 static BOOL NBShouldHideBar(void);
+static void NBUpdateStock(void);
 
 static void NBEnsureBar(UIViewController *vc) {
     UIView *host = vc.view;
@@ -21,6 +23,7 @@ static void NBEnsureBar(UIViewController *vc) {
     if (!gBar) {
         gBar = [[NBBarView alloc] initWithFrame:host.bounds];
         gBar.suppressProbe = ^BOOL{ return NBShouldHideBar(); };
+        gBar.tickHook = ^{ NBUpdateStock(); };   // the system brings hidden views back from time to time
     }
     if (gBar.superview != host) {
         gBar.frame = host.bounds;
@@ -65,10 +68,29 @@ static void NBHideMediaWithBackground(UIView *media, UIView *host) {
     }
 }
 
+// The class names of the "Press Home to unlock" hint differ between iOS versions, so it is also found by its text.
+static NSString *NBViewText(UIView *v) {
+    if ([v isKindOfClass:[UILabel class]]) return ((UILabel *)v).text;
+    if ([v respondsToSelector:NSSelectorFromString(@"string")]) {
+        id s = ((id (*)(id, SEL))objc_msgSend)(v, NSSelectorFromString(@"string"));
+        if ([s isKindOfClass:[NSString class]]) return s;
+    }
+    return nil;
+}
+
+static BOOL NBIsHintText(NSString *t) {
+    if (!t.length || t.length > 90) return NO;
+    NSString *l = t.lowercaseString;
+    NSArray *needles = @[@"разблокир", @"«домой»", @"кнопку домой", @"чтобы открыть", @"press home", @"to unlock", @"to open", @"touch id", @"face id"];
+    for (NSString *n in needles) if ([l containsString:n]) return YES;
+    return NO;
+}
+
 static void NBScan(UIView *root, UIView *host, BOOL media, BOOL hint, int depth) {
     if (depth > 14) return;
     for (UIView *v in [root.subviews copy]) {
         if (v == gBar) continue;
+        NSString *cn = NSStringFromClass([v class]);
         if (media && NBIsStockMedia(v)) {
             NBHideMediaWithBackground(v, host);
             continue;
@@ -77,7 +99,12 @@ static void NBScan(UIView *root, UIView *host, BOOL media, BOOL hint, int depth)
             NBHideView(v, gHiddenHint);
             continue;
         }
-        NBScan(v, host, media, hint, depth + 1);
+        BOOL hintHere = hint && ![cn containsString:@"Notification"];   // never touch notification text
+        if (hintHere && ([cn containsString:@"Label"] || [cn containsString:@"Legibility"]) && NBIsHintText(NBViewText(v))) {
+            NBHideView(v, gHiddenHint);
+            continue;
+        }
+        NBScan(v, host, media, hintHere, depth + 1);
     }
 }
 
@@ -131,11 +158,17 @@ static void NBMaybeDump(void) {}
 
 #pragma mark - Menus, search, notification history, passcode, keyboard
 
+// Idea: the lock screen has a main page. Whatever pulls the screen away from it (search / "Today" page,
+// camera page, notification history, keyboard, passcode) means the capsule must get out of the way.
+// So instead of guessing class names, the scroll positions are compared with where they were at rest.
+
 static BOOL gKeyboardUp;
 static BOOL gPasscodeCached;
-static NSHashTable<UIView *> *gMenuViews;       // "Today" / search pages (slide in from the side)
-static NSHashTable<UIScrollView *> *gNotifScrolls;
+static NSHashTable<UIScrollView *> *gPageScrolls;    // horizontally paged scroll views (lock screen pages)
+static NSHashTable<UIScrollView *> *gNotifScrolls;   // notification lists
+static NSMapTable<UIScrollView *, NSValue *> *gBase; // resting content offset
 static CFAbsoluteTime gLastScan;
+static CFAbsoluteTime gBaselineUntil;                // right after the lock screen appears: learn the resting offsets
 static NSString *gReason;
 
 static CGFloat NBEffectiveAlpha(UIView *v) {
@@ -147,7 +180,6 @@ static CGFloat NBEffectiveAlpha(UIView *v) {
     return a;
 }
 
-// Fraction of the lock screen covered by this view (0 when it is off screen, hidden or transparent).
 static CGFloat NBCoverage(UIView *v, UIView *host) {
     if (v.hidden || !v.window || NBEffectiveAlpha(v) < 0.3) return 0;
     CGRect r = [host convertRect:v.bounds fromView:v];
@@ -158,75 +190,108 @@ static CGFloat NBCoverage(UIView *v, UIView *host) {
 }
 
 static void NBCollect(UIView *root, UIView *host, int depth, BOOL *passcode) {
-    if (depth > 14) return;
+    if (depth > 16) return;
     for (UIView *v in root.subviews) {
         if (v == gBar) continue;
         NSString *n = NSStringFromClass([v class]);
         if ([n containsString:@"Passcode"] && NBCoverage(v, host) > 0.25) *passcode = YES;
-        if ([n containsString:@"Today"] || [n containsString:@"Spotlight"] || [n containsString:@"Search"] || [n hasPrefix:@"SPUI"]) {
-            [gMenuViews addObject:v];
-        }
-        if ([v isKindOfClass:[UIScrollView class]] && [n containsString:@"Notification"]) {
-            [gNotifScrolls addObject:(UIScrollView *)v];
+        if ([v isKindOfClass:[UIScrollView class]]) {
+            UIScrollView *sv = (UIScrollView *)v;
+            CGFloat w = sv.bounds.size.width;
+            if (w >= host.bounds.size.width * 0.6 && sv.contentSize.width >= w * 1.6) [gPageScrolls addObject:sv];
+            if ([n containsString:@"Notification"]) [gNotifScrolls addObject:sv];
         }
         NBCollect(v, host, depth + 1, passcode);
     }
+}
+
+static CGPoint NBBaseFor(UIScrollView *sv, BOOL learn) {
+    NSValue *b = [gBase objectForKey:sv];
+    if (!b || (learn && !sv.isDragging && !sv.isDecelerating)) {
+        b = [NSValue valueWithCGPoint:sv.contentOffset];
+        [gBase setObject:b forKey:sv];
+    }
+    return b.CGPointValue;
+}
+
+static BOOL NBKeyboardOnScreen(void) {
+    if (gKeyboardUp) return YES;
+    Class k = NSClassFromString(@"UIKeyboard");
+    SEL s = NSSelectorFromString(@"isOnScreen");
+    if (k && [k respondsToSelector:s]) return ((BOOL (*)(id, SEL))objc_msgSend)((id)k, s);
+    return NO;
 }
 
 static BOOL NBShouldHideBar(void) {
     UIView *host = gHost;
     if (!host || !host.window) return NO;
 
-    // the tree is walked a few times per second, the cached views are checked on every call
     CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-    if (now - gLastScan > 0.25) {
+    if (now - gLastScan > 0.3) {
         gLastScan = now;
-        [gMenuViews removeAllObjects];
+        [gPageScrolls removeAllObjects];
         [gNotifScrolls removeAllObjects];
         BOOL pc = NO;
         NBCollect(host, host, 0, &pc);
         gPasscodeCached = pc;
     }
+    BOOL learning = now < gBaselineUntil;
 
     NSString *reason = nil;
-    if (gKeyboardUp) reason = @"keyboard";
+    if (NBKeyboardOnScreen()) reason = @"keyboard";
     else if (gPasscodeCached) reason = @"passcode";
+
     if (!reason) {
-        for (UIView *v in gMenuViews.allObjects) {
-            // page views (today / search) slide in from the side; a large visible part means a menu is open
-            if (NBCoverage(v, host) > 0.12) { reason = [@"menu:" stringByAppendingString:NSStringFromClass([v class])]; break; }
+        for (UIScrollView *sv in gPageScrolls.allObjects) {
+            CGPoint base = NBBaseFor(sv, learning);
+            if (learning) continue;
+            if (fabs(sv.contentOffset.x - base.x) > sv.bounds.size.width * 0.18) {
+                reason = [NSString stringWithFormat:@"page:%@ off=%.0f base=%.0f", NSStringFromClass([sv class]), sv.contentOffset.x, base.x];
+                break;
+            }
         }
     }
     if (!reason) {
         for (UIScrollView *sv in gNotifScrolls.allObjects) {
-            if (sv.window && NBEffectiveAlpha(sv) > 0.3 && sv.contentOffset.y + sv.adjustedContentInset.top > 40) {
-                reason = [@"notifications:" stringByAppendingString:NSStringFromClass([sv class])];
+            CGPoint base = NBBaseFor(sv, learning);
+            if (learning) continue;
+            if (sv.window && NBEffectiveAlpha(sv) > 0.3 && sv.contentOffset.y - base.y > 40) {
+                reason = [NSString stringWithFormat:@"notifications:%@ off=%.0f base=%.0f", NSStringFromClass([sv class]), sv.contentOffset.y, base.y];
                 break;
             }
         }
     }
 
 #ifdef NB_DEBUG
-    static NSString *lastReason;
+    static NSString *lastKind;
     static int writes;
-    if (!(reason == lastReason || [reason isEqualToString:lastReason]) && writes < 40) {
-        lastReason = reason;
+    NSString *kind = [[reason componentsSeparatedByString:@" "] firstObject];
+    if (!(kind == lastKind || [kind isEqualToString:lastKind]) && writes < 60) {
+        lastKind = kind;
         writes++;
         NSString *path = @"/var/mobile/Documents/NowBarX-menus.txt";
         NSString *old = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
-        NSString *line = [NSString stringWithFormat:@"%@ hide=%@\n", [NSDate date], reason ?: @"no"];
+        NSString *line = [NSString stringWithFormat:@"%@ hide=%@ pages=%lu notif=%lu\n", [NSDate date], reason ?: @"no", (unsigned long)gPageScrolls.count, (unsigned long)gNotifScrolls.count];
         [[old stringByAppendingString:line] writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        if (reason && writes < 12) {   // full tree at the moment a menu is open, for diagnosis
-            NSMutableString *out = [NSMutableString stringWithFormat:@"reason=%@ keyboard=%d\n", reason, gKeyboardUp];
-            NBDumpTree(host, 0, out);
-            NSString *tp = [NSString stringWithFormat:@"/var/mobile/Documents/NowBarX-tree-%d.txt", writes];
-            [out writeToFile:tp atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        }
     }
 #endif
     gReason = reason;
     return reason != nil;
 }
+
+#ifdef NB_DEBUG
+// Every scroll view of the lock screen, to see what the pages are called if detection does not work.
+static void NBDumpScrolls(UIView *v, int depth, NSMutableString *out) {
+    if (depth > 16) return;
+    if ([v isKindOfClass:[UIScrollView class]]) {
+        UIScrollView *sv = (UIScrollView *)v;
+        [out appendFormat:@"%@ bounds=%@ content=%@ offset=%@ inset=%@ paging=%d depth=%d\n", NSStringFromClass([v class]),
+            NSStringFromCGSize(sv.bounds.size), NSStringFromCGSize(sv.contentSize), NSStringFromCGPoint(sv.contentOffset),
+            NSStringFromUIEdgeInsets(sv.adjustedContentInset), sv.isPagingEnabled, depth];
+    }
+    for (UIView *s in v.subviews) NBDumpScrolls(s, depth + 1, out);
+}
+#endif
 
 #pragma mark - Hooks
 
@@ -240,6 +305,7 @@ static BOOL NBShouldHideBar(void) {
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
     gKeyboardUp = NO;   // a keyboard that was up when the lock screen went away must not stick
+    gBaselineUntil = CFAbsoluteTimeGetCurrent() + 1.2;   // learn the resting scroll positions
     NBEnsureBar(self);
     [gBar setActive:YES];
     NBUpdateStock();
@@ -249,6 +315,19 @@ static BOOL NBShouldHideBar(void) {
     %orig;
     NBUpdateStock();
     NBMaybeDump();
+#ifdef NB_DEBUG
+    static int scrollDumps;
+    if (scrollDumps < 3) {
+        scrollDumps++;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            UIView *h = gHost;
+            if (!h) return;
+            NSMutableString *out = [NSMutableString string];
+            NBDumpScrolls(h, 0, out);
+            [out writeToFile:[NSString stringWithFormat:@"/var/mobile/Documents/NowBarX-scrolls-%d.txt", scrollDumps] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        });
+    }
+#endif
 }
 
 - (void)viewDidLayoutSubviews {
@@ -269,8 +348,9 @@ static BOOL NBShouldHideBar(void) {
     @autoreleasepool {
         gHiddenMedia = [NSHashTable weakObjectsHashTable];
         gHiddenHint = [NSHashTable weakObjectsHashTable];
-        gMenuViews = [NSHashTable weakObjectsHashTable];
+        gPageScrolls = [NSHashTable weakObjectsHashTable];
         gNotifScrolls = [NSHashTable weakObjectsHashTable];
+        gBase = [NSMapTable weakToStrongObjectsMapTable];
         NSNotificationCenter *kc = [NSNotificationCenter defaultCenter];
         [kc addObserverForName:UIKeyboardWillShowNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *n) { gKeyboardUp = YES; }];
         [kc addObserverForName:UIKeyboardWillHideNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *n) { gKeyboardUp = NO; }];

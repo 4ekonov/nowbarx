@@ -47,6 +47,7 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
             @"ambDate": @YES,
             @"ambStorage": @NO,
             @"cornerRadius": @100.0,
+            @"animScale": @2.0,
             @"capsuleShade": @0.0,
             @"btnShade": @0.0,
             @"btnOpacity": @30.0,
@@ -119,6 +120,7 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
     _capsuleShade = MAX(0.0, MIN(60.0, [_defaults doubleForKey:@"capsuleShade"])) / 100.0;
     _btnShade = MAX(0.0, MIN(60.0, [_defaults doubleForKey:@"btnShade"])) / 100.0;
     _btnOpacity = MAX(0.0, MIN(100.0, [_defaults doubleForKey:@"btnOpacity"])) / 100.0;
+    _animScale = MAX(0.25, MIN(6.0, [_defaults doubleForKey:@"animScale"]));
     _cornerRadius = MAX(0.0, MIN(100.0, [_defaults doubleForKey:@"cornerRadius"])) / 100.0;
     _showAlarm = [_defaults boolForKey:@"showAlarm"];
     _spotifyOnly = [_defaults boolForKey:@"spotifyOnly"];

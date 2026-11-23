@@ -124,7 +124,7 @@ static id NBFetchAlarm(id mgr, NSMutableString *dbg) {
         [dbg appendFormat:@"%@ -> raw=%@ resolved=%@\n", sel,
             raw ? NSStringFromClass([raw class]) : @"nil", r ? NSStringFromClass([r class]) : @"nil"];
         if ([r isKindOfClass:[NSArray class]]) r = [(NSArray *)r firstObject];
-        if (r && ![r isKindOfClass:[NSNull class]]) return r;
+        if (r && ![r isKindOfClass:[NSNull class]] && ![r isKindOfClass:[NSError class]]) return r;
     }
     return nil;
 }
@@ -516,10 +516,18 @@ static void NBWriteClockDebug(NSString *body) {
     NBItem *alarmItem = nil;
     if (st.enabled && st.showAlarm && _alarmMgr) {
         id a = NBFetchAlarm(_alarmMgr, dbg);
-        if (a) {
+        // only a real, switched-on alarm counts (a missing property used to read as 0 and became "00:00")
+        id enabledObj = NBVal(a, @"enabled") ?: NBVal(a, @"isEnabled");
+        BOOL disabled = [enabledObj isKindOfClass:[NSNumber class]] && ![enabledObj boolValue];
+        if (a && !disabled) {
             NSDate *fd = NBVal(a, @"nextFireDate");
             if (![fd isKindOfClass:[NSDate class]]) {
-                fd = NBNextOccurrence([NBVal(a, @"hour") integerValue], [NBVal(a, @"minute") integerValue]);
+                fd = nil;
+                id h = NBVal(a, @"hour"), m = NBVal(a, @"minute");
+                BOOL knownOn = [enabledObj isKindOfClass:[NSNumber class]] && [enabledObj boolValue];
+                if (knownOn && [h isKindOfClass:[NSNumber class]] && [m isKindOfClass:[NSNumber class]]) {
+                    fd = NBNextOccurrence([h integerValue], [m integerValue]);
+                }
             }
             NSTimeInterval until = fd ? [fd timeIntervalSinceNow] : -1;
             [dbg appendFormat:@"alarm %@ fire=%@ until=%.0f window=%.0f min\n", a, fd, until, st.alarmWindow];

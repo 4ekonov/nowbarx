@@ -6,6 +6,9 @@
 
 #pragma mark - Helpers
 
+// All motion is slowed down by the "animation slowdown" setting (default x2).
+#define NBD(x) ((x) * [NBSettings shared].animScale)
+
 static NSString *NBFmt(NSTimeInterval s) {
     NSInteger t = MAX(0, (NSInteger)s);
     NSInteger h = t / 3600, m = (t % 3600) / 60, sec = t % 60;
@@ -464,7 +467,7 @@ static UIColor *NBAccent(void) {
 
 - (void)configure:(NBItem *)item {
     _item = item;
-    [UIView animateWithDuration:0.35 animations:^{ [self applyStyle]; }];
+    [UIView animateWithDuration:NBD(0.35) animations:^{ [self applyStyle]; }];
     BOOL media = item.type == NBItemTypeMedia;
     BOOL timer = item.type == NBItemTypeTimer;
     BOOL stopwatch = item.type == NBItemTypeStopwatch;
@@ -934,7 +937,7 @@ static UIColor *NBAccent(void) {
     if (!want && _suppressed) {
         // the screen must stay clear for a moment before the bar returns (avoids flicker)
         if (_clearSince == 0) _clearSince = now;
-        if (now - _clearSince < 0.3) return;
+        if (now - _clearSince < 0.5) return;
     } else {
         _clearSince = 0;
     }
@@ -962,7 +965,7 @@ static UIColor *NBAccent(void) {
     };
     if (hide) [self layoutStackAnimated:animated];   // collapses an expanded card on the way out
     if (!animated) { apply(); return; }
-    [UIView animateWithDuration:hide ? 0.42 : 0.55 delay:0
+    [UIView animateWithDuration:NBD(hide ? 0.42 : 0.55) delay:0
          usingSpringWithDamping:hide ? 0.92 : 0.8 initialSpringVelocity:0
                         options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction
                      animations:apply completion:nil];
@@ -1017,6 +1020,7 @@ static UIColor *NBAccent(void) {
 
 - (void)tickFired {
     for (NBCardView *c in _cards.allValues) [c tick];
+    if (self.tickHook) self.tickHook();
     if ((++_btnTick % 4) == 0) {
         if (!_btnL.hidden) [_btnL refreshState];
         if (!_btnR.hidden) [_btnR refreshState];
@@ -1069,7 +1073,7 @@ static UIColor *NBAccent(void) {
     };
     _btnL.hidden = !showL;
     _btnR.hidden = !showR;
-    if (animated) [UIView animateWithDuration:0.25 animations:apply]; else apply();
+    if (animated) [UIView animateWithDuration:NBD(0.25) animations:apply]; else apply();
 }
 
 #pragma mark Data
@@ -1132,7 +1136,7 @@ static UIColor *NBAccent(void) {
         structural = YES;
         NBCardView *dead = _cards[k];
         [_cards removeObjectForKey:k];
-        [UIView animateWithDuration:0.28 delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{
+        [UIView animateWithDuration:NBD(0.28) delay:0 options:UIViewAnimationOptionBeginFromCurrentState animations:^{
             dead.alpha = 0;
             dead.transform = CGAffineTransformConcat(CGAffineTransformMakeScale(0.7, 0.7), CGAffineTransformMakeTranslation(0, 18));
         } completion:^(BOOL finished) {
@@ -1233,11 +1237,11 @@ static UIColor *NBAccent(void) {
     };
 
     if (animated) {
-        [UIView animateWithDuration:0.6 delay:0 usingSpringWithDamping:0.78 initialSpringVelocity:0.7
+        [UIView animateWithDuration:NBD(0.6) delay:0 usingSpringWithDamping:0.78 initialSpringVelocity:0.7
                             options:UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionBeginFromCurrentState
                          animations:frames completion:nil];
-        [UIView animateWithDuration:expandedMode ? 0.28 : 0.2
-                              delay:expandedMode ? 0.08 : 0
+        [UIView animateWithDuration:NBD(expandedMode ? 0.28 : 0.2)
+                              delay:NBD(expandedMode ? 0.08 : 0)
                             options:UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionBeginFromCurrentState
                          animations:fades completion:nil];
     } else {
