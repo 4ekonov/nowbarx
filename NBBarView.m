@@ -882,6 +882,7 @@ static UIColor *NBAccent(void) {
     NSInteger _index;
     BOOL _isExpanded;
     BOOL _suppressed;
+    CFTimeInterval _quietUntil;   // right after the screen turns on: no entrance animations
     CFTimeInterval _clearSince;
     CAShapeLayer *_arcL, *_arcR;   // the "(" ")" marks beside the capsule
     UIView *_cardLayer;            // holds all cards, so the whole stack can slide away as one
@@ -938,6 +939,8 @@ static UIColor *NBAccent(void) {
 - (CGSize)expandedSizeForItem:(NBItem *)item {
     return CGSizeMake(MIN(self.bounds.size.width - 32, 420), [NBCardView expandedHeightForItem:item]);
 }
+
+- (CGRect)capsuleFrame { return [self placeSize:[self collapsedSize]]; }
 
 - (CGRect)placeSize:(CGSize)sz {
     NBSettings *st = [NBSettings shared];
@@ -1047,6 +1050,7 @@ static UIColor *NBAccent(void) {
         [_suppressLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
         [self layoutLockButtonsAnimated:NO];
         _clearSince = 0;
+        _quietUntil = CACurrentMediaTime() + 1.5;
         [self checkSuppressedAnimated:NO];
         [_btnL refreshState];
         [_btnR refreshState];
@@ -1178,8 +1182,13 @@ static UIColor *NBAccent(void) {
     // enter state: small, low and transparent; the stack layout animates it in
     CGRect F = [self placeSize:[self collapsedSize]];
     c.center = CGPointMake(CGRectGetMidX(F), CGRectGetMidY(F));
-    c.transform = CGAffineTransformConcat(CGAffineTransformMakeScale(0.6, 0.6), CGAffineTransformMakeTranslation(0, 22));
-    c.alpha = 0;
+    if (CACurrentMediaTime() < _quietUntil) {
+        c.transform = CGAffineTransformIdentity;   // the screen just turned on: already in place, no entrance
+        c.alpha = 1;
+    } else {
+        c.transform = CGAffineTransformConcat(CGAffineTransformMakeScale(0.6, 0.6), CGAffineTransformMakeTranslation(0, 22));
+        c.alpha = 0;
+    }
     c.cornerRadius = [self collapsedSize].height / 2 * [NBSettings shared].cornerRadius;
     [_cardLayer addSubview:c];
     return c;
@@ -1243,7 +1252,7 @@ static UIColor *NBAccent(void) {
         [c layoutBoxesExpanded:(_isExpanded && [it.key isEqualToString:items[_index].key])];
     }
 
-    [self layoutStackAnimated:structural];
+    [self layoutStackAnimated:(structural && CACurrentMediaTime() >= _quietUntil)];
 }
 
 #pragma mark Stack layout

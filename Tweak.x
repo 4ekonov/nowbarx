@@ -166,6 +166,7 @@ static BOOL gKeyboardUp;
 static BOOL gPasscodeCached;
 static NSHashTable<UIScrollView *> *gPageScrolls;    // horizontally paged scroll views (lock screen pages)
 static NSHashTable<UIScrollView *> *gNotifScrolls;   // notification lists
+static NSHashTable<UIView *> *gNotifCells;           // notification cards (anything that can cover the capsule)
 static NSMapTable<UIScrollView *, NSValue *> *gBase; // resting content offset
 static CFAbsoluteTime gLastScan;
 static CFAbsoluteTime gBaselineUntil;                // right after the lock screen appears: learn the resting offsets
@@ -200,6 +201,8 @@ static void NBCollect(UIView *root, UIView *host, int depth, BOOL *passcode) {
             CGFloat w = sv.bounds.size.width;
             if (w >= host.bounds.size.width * 0.6 && sv.contentSize.width >= w * 1.6) [gPageScrolls addObject:sv];
             if ([n containsString:@"Notification"]) [gNotifScrolls addObject:sv];
+        } else if ([n containsString:@"NotificationListCell"] || [n containsString:@"ShortLookView"] || [n containsString:@"NotificationViewControllerView"]) {
+            [gNotifCells addObject:v];
         }
         NBCollect(v, host, depth + 1, passcode);
     }
@@ -231,6 +234,7 @@ static BOOL NBShouldHideBar(void) {
         gLastScan = now;
         [gPageScrolls removeAllObjects];
         [gNotifScrolls removeAllObjects];
+        [gNotifCells removeAllObjects];
         BOOL pc = NO;
         NBCollect(host, host, 0, &pc);
         gPasscodeCached = pc;
@@ -241,8 +245,8 @@ static BOOL NBShouldHideBar(void) {
     // the notification curtain / any slide of the whole lock screen: it is not sitting at its home position
     CALayer *pl = host.layer.presentationLayer ?: host.layer;
     CGPoint o = [pl convertPoint:CGPointZero toLayer:host.window.layer];
-    if (fabs(o.x) > 4 || fabs(o.y) > 4) reason = [NSString stringWithFormat:@"moved %.0f,%.0f", o.x, o.y];
-    else if (NBEffectiveAlpha(host) < 0.5) reason = @"faded";
+    if (!learning && (fabs(o.x) > 4 || fabs(o.y) > 4)) reason = [NSString stringWithFormat:@"moved %.0f,%.0f", o.x, o.y];
+    else if (!learning && NBEffectiveAlpha(host) < 0.5) reason = @"faded";
     else if (NBKeyboardOnScreen()) reason = @"keyboard";
     else if (gPasscodeCached) reason = @"passcode";
 
@@ -260,10 +264,20 @@ static BOOL NBShouldHideBar(void) {
         for (UIScrollView *sv in gNotifScrolls.allObjects) {
             CGPoint base = NBBaseFor(sv, learning);
             if (learning) continue;
-            if (sv.window && NBEffectiveAlpha(sv) > 0.3 && sv.contentOffset.y - base.y > 40) {
+            if (sv.window && NBEffectiveAlpha(sv) > 0.3 && fabs(sv.contentOffset.y - base.y) > 30) {
                 reason = [NSString stringWithFormat:@"notifications:%@ off=%.0f base=%.0f", NSStringFromClass([sv class]), sv.contentOffset.y, base.y];
                 break;
             }
+        }
+    }
+
+    if (!reason && !learning && gBar) {
+        // notification cards pushed up over the capsule (swipe up on the lock screen)
+        CGRect cap = CGRectInset([gBar capsuleFrame], -6, -6);
+        for (UIView *c in gNotifCells.allObjects) {
+            if (!c.window || NBEffectiveAlpha(c) < 0.3) continue;
+            CGRect r = [host convertRect:c.bounds fromView:c];
+            if (CGRectIntersectsRect(r, cap)) { reason = [NSString stringWithFormat:@"cells:%@", NSStringFromClass([c class])]; break; }
         }
     }
 
@@ -354,6 +368,7 @@ static void NBDumpScrolls(UIView *v, int depth, NSMutableString *out) {
         gHiddenMedia = [NSHashTable weakObjectsHashTable];
         gHiddenHint = [NSHashTable weakObjectsHashTable];
         gPageScrolls = [NSHashTable weakObjectsHashTable];
+        gNotifCells = [NSHashTable weakObjectsHashTable];
         gNotifScrolls = [NSHashTable weakObjectsHashTable];
         gBase = [NSMapTable weakToStrongObjectsMapTable];
         NSNotificationCenter *kc = [NSNotificationCenter defaultCenter];
