@@ -227,7 +227,7 @@ static BOOL NBShouldHideBar(void) {
     if (!host || !host.window) return NO;
 
     CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-    if (now - gLastScan > 0.3) {
+    if (now - gLastScan > 0.2) {
         gLastScan = now;
         [gPageScrolls removeAllObjects];
         [gNotifScrolls removeAllObjects];
@@ -238,7 +238,12 @@ static BOOL NBShouldHideBar(void) {
     BOOL learning = now < gBaselineUntil;
 
     NSString *reason = nil;
-    if (NBKeyboardOnScreen()) reason = @"keyboard";
+    // the notification curtain / any slide of the whole lock screen: it is not sitting at its home position
+    CALayer *pl = host.layer.presentationLayer ?: host.layer;
+    CGPoint o = [pl convertPoint:CGPointZero toLayer:host.window.layer];
+    if (fabs(o.x) > 4 || fabs(o.y) > 4) reason = [NSString stringWithFormat:@"moved %.0f,%.0f", o.x, o.y];
+    else if (NBEffectiveAlpha(host) < 0.5) reason = @"faded";
+    else if (NBKeyboardOnScreen()) reason = @"keyboard";
     else if (gPasscodeCached) reason = @"passcode";
 
     if (!reason) {

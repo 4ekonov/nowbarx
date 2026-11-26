@@ -43,6 +43,9 @@ static UIColor *NBLighten(UIColor *c, CGFloat amount) {
     return [UIColor colorWithRed:r + (1 - r) * amount green:g + (1 - g) * amount blue:b + (1 - b) * amount alpha:a];
 }
 
+static UIColor *NBBlue(void) { return [UIColor colorWithRed:0.30 green:0.58 blue:1.0 alpha:1]; }
+static UIColor *NBBlueSolid(void) { return [UIColor colorWithRed:0.04 green:0.52 blue:1.0 alpha:1]; }
+
 static UIImage *NBSym(NSString *name, CGFloat pt) {
     UIImageSymbolConfiguration *c = [UIImageSymbolConfiguration configurationWithPointSize:pt weight:UIImageSymbolWeightSemibold];
     return [UIImage systemImageNamed:name withConfiguration:c];
@@ -66,10 +69,12 @@ static UIColor *NBAccent(void) {
 - (void)setGlyph:(NSString *)name;
 - (void)setAccent:(UIColor *)accent;   // nil = default orange
 - (void)setPlain:(BOOL)plain;          // plain: no ring, only a tinted round icon (status cards)
+- (void)setBare:(BOOL)bare;            // bare: only a big coloured glyph (timer / alarm / stopwatch)
 @end
 
 @implementation NBRingView {
     BOOL _plain;
+    BOOL _bare;
     CAShapeLayer *_track;
     CAShapeLayer *_arc;
     UIImageView *_glyph;
@@ -117,18 +122,23 @@ static UIColor *NBAccent(void) {
     _arc.lineWidth = lw;
     _arc.strokeEnd = _progress;
     [CATransaction commit];
-    _track.hidden = _plain;
-    _arc.hidden = _plain;
+    _track.hidden = _plain || _bare;
+    _arc.hidden = _plain || _bare;
     _glyph.frame = self.bounds;
     _glyph.layer.cornerRadius = _plain ? w / 2 : 0;
     _glyph.backgroundColor = _plain ? [_glyph.tintColor colorWithAlphaComponent:0.2] : [UIColor clearColor];
-    if (_glyphName) _glyph.image = NBSym(_glyphName, w * (_plain ? 0.46 : 0.42));
+    if (_glyphName) _glyph.image = NBSym(_glyphName, w * (_bare ? 0.7 : (_plain ? 0.46 : 0.42)));
 }
 
 - (void)setAccent:(UIColor *)accent {
     UIColor *c = accent ?: NBAccent();
     _arc.strokeColor = c.CGColor;
     _glyph.tintColor = c;
+    [self setNeedsLayout];
+}
+
+- (void)setBare:(BOOL)bare {
+    _bare = bare;
     [self setNeedsLayout];
 }
 
@@ -303,8 +313,8 @@ static UIColor *NBAccent(void) {
         _blur.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         _blur.clipsToBounds = YES;
         _blur.layer.cornerCurve = kCACornerCurveContinuous;
-        _blur.layer.borderWidth = 0.5;
-        _blur.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.12].CGColor;
+        _blur.layer.borderWidth = 1.0;                       // ColorOS: thin light rim around the glass
+        _blur.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.24].CGColor;
         [_host addSubview:_blur];
 
         _collapsedBox = [UIView new];
@@ -382,6 +392,7 @@ static UIColor *NBAccent(void) {
 - (void)tapPlay {
     // on status cards the trailing button runs the card's own action (e.g. flashlight off)
     if (_item.type == NBItemTypeStatus) { if (_item.action) _item.action(); return; }
+    if (_item.type == NBItemTypeTimer) { [self tapToggle]; return; }
     if (self.onPlay) self.onPlay();
 }
 - (void)tapNext { if (self.onNext) self.onNext(); }
@@ -400,7 +411,7 @@ static UIColor *NBAccent(void) {
 - (void)applyStyle {
     NBSettings *st = [NBSettings shared];
     if (!_styleInit || _blurOn != st.useBlur) {
-        _blur.effect = st.useBlur ? [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark] : nil;
+        _blur.effect = st.useBlur ? [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterialDark] : nil;
         _blurOn = st.useBlur;
         _styleInit = YES;
     }
@@ -478,7 +489,7 @@ static UIColor *NBAccent(void) {
     // collapsed
     _cArt.hidden = !media;
     _cRing.hidden = media;
-    _cPlay.hidden = !(media || hasAction);
+    _cPlay.hidden = !(media || hasAction || timer);
     _cPrev.hidden = _cNext.hidden = !media;
     _cTitle.text = item.title;
     if (media) {
@@ -496,12 +507,14 @@ static UIColor *NBAccent(void) {
         _cSub.textColor = [UIColor colorWithWhite:1 alpha:0.65];
         [_cPlay setImage:NBSym(item.playing ? @"pause.fill" : @"play.fill", 14) forState:UIControlStateNormal];
     } else {
-        NSString *glyph = timer ? @"timer" : stopwatch ? @"stopwatch" : status ? (item.symbol ?: @"circle.fill") : @"alarm.fill";
+        NSString *glyph = timer ? @"hourglass" : stopwatch ? @"stopwatch.fill" : status ? (item.symbol ?: @"circle.fill") : @"alarm.fill";
         [_cRing setGlyph:glyph];
         [_cRing setPlain:status];
-        [_cRing setAccent:status ? item.accent : nil];
-        _cTitle.textColor = [UIColor colorWithWhite:1 alpha:0.65];
+        [_cRing setBare:!status];
+        [_cRing setAccent:status ? item.accent : NBBlue()];
+        _cTitle.textColor = [UIColor colorWithWhite:1 alpha:0.85];
         _cSub.textColor = [UIColor whiteColor];
+        if (timer) [_cPlay setImage:NBSym(item.paused ? @"play.fill" : @"pause.fill", 14) forState:UIControlStateNormal];
         if (status) {
             _cSub.text = item.subtitle;
             if (hasAction) [_cPlay setImage:NBSym(item.actionSymbol ?: @"xmark", 14) forState:UIControlStateNormal];
@@ -549,7 +562,7 @@ static UIColor *NBAccent(void) {
     } else {
         _eArt.image = NBSym(@"alarm.fill", 22);
         _eArt.contentMode = UIViewContentModeCenter;
-        _eArt.backgroundColor = NBAccent();
+        _eArt.backgroundColor = NBBlue();
         _eArt.layer.cornerRadius = 24;
     }
 
@@ -564,7 +577,8 @@ static UIColor *NBAccent(void) {
     CGFloat u = h / 58.0;
     BOOL media = _item.type == NBItemTypeMedia;
     BOOL status = _item.type == NBItemTypeStatus;
-    BOOL hasAction = status && _item.action != nil;
+    BOOL timerBtn = _item.type == NBItemTypeTimer;
+    BOOL hasAction = (status && _item.action != nil) || timerBtn;
     NBSettings *cst = [NBSettings shared];
     CGFloat padX = cst.contentPadX;
     CGFloat padY = cst.contentPadY;
@@ -609,16 +623,17 @@ static UIColor *NBAccent(void) {
         right = btn + padX + 6 * u;
         _cPlay.frame = CGRectMake(w - padX - btn, (h - btn) / 2, btn, btn);
         _cPlay.layer.cornerRadius = btn / 2;
-        _cPlay.backgroundColor = [UIColor colorWithWhite:1 alpha:0.16];
+        _cPlay.backgroundColor = timerBtn ? NBBlueSolid() : [UIColor colorWithWhite:1 alpha:0.18];   // solid blue like ColorOS timers
         _cPlay.clipsToBounds = YES;
     }
     CGFloat tw = MAX(0, w - tx - right);
-    _cTitle.font = [UIFont systemFontOfSize:11 * u weight:UIFontWeightMedium];
-    _cSub.font = status ? [UIFont systemFontOfSize:17 * u weight:UIFontWeightSemibold] : NBMono(21 * u, UIFontWeightSemibold);
-    _cSub.adjustsFontSizeToFitWidth = status;
+    // ColorOS order: the value (time) is the bold first line, the label sits under it
+    _cSub.font = status ? [UIFont systemFontOfSize:17 * u weight:UIFontWeightBold] : NBMono(18 * u, UIFontWeightBold);
+    _cTitle.font = [UIFont systemFontOfSize:13 * u weight:UIFontWeightRegular];
+    _cSub.adjustsFontSizeToFitWidth = YES;
     _cSub.minimumScaleFactor = 0.6;
-    _cTitle.frame = CGRectMake(tx, h / 2 - 19 * u, tw, 14 * u);
-    _cSub.frame = CGRectMake(tx, h / 2 - 5 * u, tw, 26 * u);
+    _cSub.frame = CGRectMake(tx, h / 2 - 20 * u, tw, 22 * u);
+    _cTitle.frame = CGRectMake(tx, h / 2 + 2 * u, tw, 17 * u);
 }
 
 - (void)layoutExpandedContent {
@@ -730,9 +745,11 @@ static UIColor *NBAccent(void) {
 
 - (instancetype)initWithFrame:(CGRect)frame {
     if ((self = [super initWithFrame:frame])) {
-        _blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterialDark]];
+        _blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];
         _blur.clipsToBounds = YES;
         _blur.layer.cornerCurve = kCACornerCurveContinuous;
+        _blur.layer.borderWidth = 1.0;
+        _blur.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.22].CGColor;
         [self addSubview:_blur];
         _glyph = [UIImageView new];
         _glyph.contentMode = UIViewContentModeCenter;
@@ -770,7 +787,7 @@ static UIColor *NBAccent(void) {
     void (^apply)(void) = ^{
         // iOS style: dark glass when off, bright white disc with a dark glyph when on
         NBSettings *st = [NBSettings shared];
-        self->_blur.contentView.backgroundColor = self->_active ? [UIColor colorWithWhite:1 alpha:0.92] : [UIColor colorWithWhite:st.btnShade alpha:st.btnOpacity];
+        self->_blur.contentView.backgroundColor = self->_active ? [UIColor colorWithRed:1.0 green:0.97 blue:0.88 alpha:0.95] : [UIColor colorWithWhite:st.btnShade alpha:st.btnOpacity];
         self->_glyph.tintColor = self->_active ? [UIColor colorWithWhite:0.08 alpha:1] : [UIColor whiteColor];
     };
     if (animated) [UIView animateWithDuration:0.25 animations:apply]; else apply();
@@ -866,8 +883,9 @@ static UIColor *NBAccent(void) {
     BOOL _isExpanded;
     BOOL _suppressed;
     CFTimeInterval _clearSince;
+    CAShapeLayer *_arcL, *_arcR;   // the "(" ")" marks beside the capsule
     UIView *_cardLayer;            // holds all cards, so the whole stack can slide away as one
-    NSTimer *_suppressTimer;
+    CADisplayLink *_suppressLink;
     NSTimer *_tick;
     CGSize _lastSize;
     UIImpactFeedbackGenerator *_haptic;
@@ -892,6 +910,16 @@ static UIColor *NBAccent(void) {
         _cardLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         _cardLayer.userInteractionEnabled = YES;    // (the bar hit-tests its cards itself, see hitTest:)
         [self addSubview:_cardLayer];
+        _arcL = [CAShapeLayer layer];
+        _arcR = [CAShapeLayer layer];
+        for (CAShapeLayer *a in @[_arcL, _arcR]) {
+            a.fillColor = nil;
+            a.strokeColor = [UIColor colorWithWhite:1 alpha:0.55].CGColor;
+            a.lineWidth = 2.2;
+            a.lineCap = kCALineCapRound;
+            a.opacity = 0;
+            [_cardLayer.layer addSublayer:a];
+        }
         _haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
         _selection = [[UISelectionFeedbackGenerator alloc] init];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemsChanged) name:NBItemsChangedNotification object:nil];
@@ -930,7 +958,11 @@ static UIColor *NBAccent(void) {
 
 // Menus (search, widgets, notification history, passcode, keyboard) take the screen: the capsule slides down
 // and the side buttons slide out to the sides. They come back when the screen is clear again.
-- (void)checkSuppressed {
+- (void)checkSuppressed { [self checkSuppressedAnimated:YES]; }
+
+- (void)linkFired:(CADisplayLink *)link { [self checkSuppressedAnimated:YES]; }
+
+- (void)checkSuppressedAnimated:(BOOL)animated {
     NBSettings *st = [NBSettings shared];
     BOOL want = st.enabled && st.hideOnPasscode && self.suppressProbe && self.suppressProbe();
     CFTimeInterval now = CACurrentMediaTime();
@@ -947,28 +979,34 @@ static UIColor *NBAccent(void) {
         _isExpanded = NO;
         [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(idleCollapse) object:nil];
     }
-    [self applySuppressionAnimated:YES];
+    [self applySuppressionAnimated:animated];
 }
 
 - (void)applySuppressionAnimated:(BOOL)animated {
     BOOL hide = _suppressed;
     CGSize b = self.bounds.size;
+    CGFloat screenH = MAX(b.height, [UIScreen mainScreen].bounds.size.height);
     CGRect F = [self placeSize:[self collapsedSize]];
-    CGFloat dy = b.height - F.origin.y + 70;
-    CGFloat lw = _btnL.bounds.size.width, rw = _btnR.bounds.size.width;
-    CGFloat ldx = -(_btnL.center.x + lw / 2 + 24);
-    CGFloat rdx = b.width - (_btnR.center.x - rw / 2) + 24;
+    // one common distance: capsule, arcs and both buttons all drop below the screen edge together
+    CGFloat dy = screenH - MIN(F.origin.y, screenH) + 80;
     void (^apply)(void) = ^{
-        self->_cardLayer.transform = hide ? CGAffineTransformMakeTranslation(0, dy) : CGAffineTransformIdentity;
-        self->_btnL.transform = hide ? CGAffineTransformMakeTranslation(ldx, 0) : CGAffineTransformIdentity;
-        self->_btnR.transform = hide ? CGAffineTransformMakeTranslation(rdx, 0) : CGAffineTransformIdentity;
+        CGAffineTransform t = hide ? CGAffineTransformMakeTranslation(0, dy) : CGAffineTransformIdentity;
+        self->_cardLayer.transform = t;
+        self->_btnL.transform = t;
+        self->_btnR.transform = t;
     };
     if (hide) [self layoutStackAnimated:animated];   // collapses an expanded card on the way out
     if (!animated) { apply(); return; }
-    [UIView animateWithDuration:NBD(hide ? 0.42 : 0.55) delay:0
-         usingSpringWithDamping:hide ? 0.92 : 0.8 initialSpringVelocity:0
-                        options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction
-                     animations:apply completion:nil];
+    if (hide) {
+        // immediate: short ease-out, starts this very frame
+        [UIView animateWithDuration:0.26 delay:0
+                            options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionCurveEaseIn
+                         animations:apply completion:nil];
+    } else {
+        [UIView animateWithDuration:NBD(0.55) delay:0 usingSpringWithDamping:0.8 initialSpringVelocity:0
+                            options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction
+                         animations:apply completion:nil];
+    }
 }
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
@@ -995,8 +1033,8 @@ static UIColor *NBAccent(void) {
     [[NBDataSource shared] setPolling:active];
     [_tick invalidate];
     _tick = nil;
-    [_suppressTimer invalidate];
-    _suppressTimer = nil;
+    [_suppressLink invalidate];
+    _suppressLink = nil;
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(idleCollapse) object:nil];
     if (!active && _suppressed) {   // next time the lock screen appears, start from a clean state
         _suppressed = NO;
@@ -1005,9 +1043,11 @@ static UIColor *NBAccent(void) {
     }
     if (active) {
         _tick = [NSTimer scheduledTimerWithTimeInterval:0.25 target:self selector:@selector(tickFired) userInfo:nil repeats:YES];
-        _suppressTimer = [NSTimer scheduledTimerWithTimeInterval:0.1 target:self selector:@selector(checkSuppressed) userInfo:nil repeats:YES];
+        _suppressLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(linkFired:)];
+        [_suppressLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
         [self layoutLockButtonsAnimated:NO];
-        [self checkSuppressed];
+        _clearSince = 0;
+        [self checkSuppressedAnimated:NO];
         [_btnL refreshState];
         [_btnR refreshState];
         [self itemsChanged];
@@ -1022,6 +1062,7 @@ static UIColor *NBAccent(void) {
     for (NBCardView *c in _cards.allValues) [c tick];
     if (self.tickHook) self.tickHook();
     if ((++_btnTick % 4) == 0) {
+        [self layoutLockButtonsAnimated:NO];
         if (!_btnL.hidden) [_btnL refreshState];
         if (!_btnR.hidden) [_btnR refreshState];
     }
@@ -1030,6 +1071,7 @@ static UIColor *NBAccent(void) {
 - (void)layoutSubviews {
     [super layoutSubviews];
     [self layoutLockButtonsAnimated:NO];
+    if (_suppressed && !CGSizeEqualToSize(_lastSize, self.bounds.size)) [self applySuppressionAnimated:NO];
     if (!CGSizeEqualToSize(_lastSize, self.bounds.size)) {
         _lastSize = self.bounds.size;
         if (_items.count) {
@@ -1065,6 +1107,28 @@ static UIColor *NBAccent(void) {
     _btnR.bounds = CGRectMake(0, 0, sz, sz);
     _btnL.center = CGPointMake(lx + sz / 2, cy);
     _btnR.center = CGPointMake(rx + sz / 2, cy);
+
+    // "(" and ")" marks in the gaps beside the capsule
+    {
+        CGFloat ah = F.size.height * 0.5, aw = 6;
+        CGFloat gx = MAX(aw + 2, MIN(gap, 40) / 2);
+        UIBezierPath *pl = [UIBezierPath bezierPath];
+        [pl moveToPoint:CGPointMake(aw, 0)];
+        [pl addQuadCurveToPoint:CGPointMake(aw, ah) controlPoint:CGPointMake(-aw * 0.4, ah / 2)];
+        UIBezierPath *pr = [UIBezierPath bezierPath];
+        [pr moveToPoint:CGPointMake(0, 0)];
+        [pr addQuadCurveToPoint:CGPointMake(0, ah) controlPoint:CGPointMake(aw * 1.4, ah / 2)];
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        _arcL.path = pl.CGPath;
+        _arcR.path = pr.CGPath;
+        _arcL.frame = CGRectMake(F.origin.x - gx - aw / 2, cy - ah / 2, aw, ah);
+        _arcR.frame = CGRectMake(CGRectGetMaxX(F) + gx - aw / 2, cy - ah / 2, aw, ah);
+        BOOL arcs = on && _items.count > 0 && !_isExpanded && (showL || showR);
+        _arcL.opacity = (arcs && showL) ? 1 : 0;
+        _arcR.opacity = (arcs && showR) ? 1 : 0;
+        [CATransaction commit];
+    }
 
     CGFloat target = _isExpanded ? 0 : 1;
     void (^apply)(void) = ^{

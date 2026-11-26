@@ -1,8 +1,8 @@
 Package: com.nowbarx.tweak
 Name: NowBarX
-Version: 0.7.1
+Version: 0.8.0
 Architecture: iphoneos-arm
-Description: Samsung-style Now Bar for the iOS lock screen with side buttons, status cards, timer and player
+Description: ColorOS-style Now Bar for the iOS lock screen with side buttons, status cards, timer and player
 Maintainer: you
 Author: you
 Section: Tweaks

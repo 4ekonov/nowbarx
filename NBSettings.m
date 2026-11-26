@@ -49,13 +49,13 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
             @"cornerRadius": @100.0,
             @"animScale": @2.0,
             @"capsuleShade": @0.0,
-            @"btnShade": @0.0,
-            @"btnOpacity": @30.0,
+            @"btnShade": @100.0,
+            @"btnOpacity": @18.0,
             @"contentPadX": @16.0,
             @"contentPadY": @9.0,
             @"btnEnabled": @YES,
-            @"btnSize": @52.0,
-            @"btnGap": @12.0,
+            @"btnSize": @54.0,
+            @"btnGap": @22.0,
             @"btnLeftAction": @"flashlight",
             @"btnRightAction": @"camera",
             @"btnLeftApp": @"",
@@ -73,7 +73,7 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
             @"xOffset": @0.0,
             @"capsuleWidth": @235.0,
             @"capsuleHeight": @58.0,
-            @"bgOpacity": @0.85,
+            @"bgOpacity": @0.4,
             @"alarmWindow": @15.0,
         }];
         [self reload];
@@ -118,7 +118,7 @@ static void NBPrefsCallback(CFNotificationCenterRef center, void *observer, CFSt
     _btnLeftApp = [([_defaults stringForKey:@"btnLeftApp"] ?: @"") stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     _btnRightApp = [([_defaults stringForKey:@"btnRightApp"] ?: @"") stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     _capsuleShade = MAX(0.0, MIN(60.0, [_defaults doubleForKey:@"capsuleShade"])) / 100.0;
-    _btnShade = MAX(0.0, MIN(60.0, [_defaults doubleForKey:@"btnShade"])) / 100.0;
+    _btnShade = MAX(0.0, MIN(100.0, [_defaults doubleForKey:@"btnShade"])) / 100.0;
     _btnOpacity = MAX(0.0, MIN(100.0, [_defaults doubleForKey:@"btnOpacity"])) / 100.0;
     _animScale = MAX(0.25, MIN(6.0, [_defaults doubleForKey:@"animScale"]));
     _cornerRadius = MAX(0.0, MIN(100.0, [_defaults doubleForKey:@"cornerRadius"])) / 100.0;

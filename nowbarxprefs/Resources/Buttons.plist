@@ -38,7 +38,7 @@
 			<key>cell</key>
 			<string>PSSliderCell</string>
 			<key>default</key>
-			<real>52.0</real>
+			<real>54.0</real>
 			<key>defaults</key>
 			<string>com.nowbarx.prefs</string>
 			<key>key</key>
@@ -64,7 +64,7 @@
 			<key>cell</key>
 			<string>PSSliderCell</string>
 			<key>default</key>
-			<real>12.0</real>
+			<real>22.0</real>
 			<key>defaults</key>
 			<string>com.nowbarx.prefs</string>
 			<key>key</key>
@@ -80,9 +80,9 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>0 — чёрный, до 60% — серый.</string>
+			<string>100 — светлое стекло как в ColorOS, 0 — чёрное.</string>
 			<key>label</key>
-			<string>Цвет фона кнопок, %</string>
+			<string>Цвет стекла кнопок, %</string>
 		</dict>
 		<dict>
 			<key>PostNotification</key>
@@ -90,13 +90,13 @@
 			<key>cell</key>
 			<string>PSSliderCell</string>
 			<key>default</key>
-			<real>0.0</real>
+			<real>100.0</real>
 			<key>defaults</key>
 			<string>com.nowbarx.prefs</string>
 			<key>key</key>
 			<string>btnShade</string>
 			<key>max</key>
-			<real>60.0</real>
+			<real>100.0</real>
 			<key>min</key>
 			<real>0.0</real>
 			<key>showValue</key>
@@ -116,7 +116,7 @@
 			<key>cell</key>
 			<string>PSSliderCell</string>
 			<key>default</key>
-			<real>30.0</real>
+			<real>18.0</real>
 			<key>defaults</key>
 			<string>com.nowbarx.prefs</string>
 			<key>key</key>
